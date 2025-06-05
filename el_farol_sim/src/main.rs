@@ -28,9 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         initial_strategies: vec![
             Box::new(AlwaysGo),
             Box::new(NeverGo),
-            Box::new(GoIfLessThanSixty),
+            // Box::new(GoIfLessThanSixty),
             // Box::new(RandomPolicy),
-            Box::new(MovingAveragePolicy::new(5)),
+            // Box::new(MovingAveragePolicy::new(5)),
         ],
     };
 
