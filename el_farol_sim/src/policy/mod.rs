@@ -10,8 +10,8 @@ pub struct GameResult {
 
 /// Trait defining the behavior of a policy
 pub trait Policy: Send + Sync + Debug + ClonePolicy {
-    /// Makes a decision based on the history of past games
-    fn decide(&self, history: &[GameResult]) -> bool;
+    /// Makes a prediction of bar attendance ratio (0.0-1.0) based on the history of past games
+    fn decide(&self, history: &[GameResult]) -> f64;
     
     /// Returns a name for the policy
     fn name(&self) -> &'static str;
@@ -41,8 +41,8 @@ impl Clone for Box<dyn Policy> {
 pub struct AlwaysGo;
 
 impl Policy for AlwaysGo {
-    fn decide(&self, _history: &[GameResult]) -> bool {
-        true
+    fn decide(&self, _history: &[GameResult]) -> f64 {
+        0.59
     }
 
     fn name(&self) -> &'static str {
@@ -55,8 +55,8 @@ impl Policy for AlwaysGo {
 pub struct NeverGo;
 
 impl Policy for NeverGo {
-    fn decide(&self, _history: &[GameResult]) -> bool {
-        false
+    fn decide(&self, _history: &[GameResult]) -> f64 {
+        0.61
     }
 
     fn name(&self) -> &'static str {
@@ -69,12 +69,15 @@ impl Policy for NeverGo {
 pub struct GoIfLessThanSixty;
 
 impl Policy for GoIfLessThanSixty {
-    fn decide(&self, history: &[GameResult]) -> bool {
+    fn decide(&self, history: &[GameResult]) -> f64 {
         if let Some(last_game) = history.last() {
-            let attendance_ratio = last_game.total_attendance as f64 / last_game.total_agents as f64;
-            attendance_ratio < 0.6
+            if last_game.total_agents == 0 {
+                0.0 // Avoid division by zero, predict 0.0 ratio
+            } else {
+                last_game.total_attendance as f64 / last_game.total_agents as f64
+            }
         } else {
-            true // If no history, go
+            0.0 // If no history, predict 0.0 attendance ratio
         }
     }
 
@@ -88,8 +91,8 @@ impl Policy for GoIfLessThanSixty {
 pub struct RandomPolicy;
 
 impl Policy for RandomPolicy {
-    fn decide(&self, _history: &[GameResult]) -> bool {
-        rand::random()
+    fn decide(&self, _history: &[GameResult]) -> f64 {
+        rand::random::<f64>() // Predict a random ratio between 0.0 and 1.0
     }
 
     fn name(&self) -> &'static str {
@@ -110,21 +113,27 @@ impl MovingAveragePolicy {
 }
 
 impl Policy for MovingAveragePolicy {
-    fn decide(&self, history: &[GameResult]) -> bool {
+    fn decide(&self, history: &[GameResult]) -> f64 {
         if history.is_empty() {
-            return true;
+            return 0.0; // Predict 0.0 ratio if no history
         }
 
         let relevant_history: Vec<GameResult> = history.iter().rev().take(self.window_size).cloned().collect();
-        if relevant_history.is_empty() { // Handle case where window_size > history.len()
-            return true; // Or some other default behavior
+        if relevant_history.is_empty() { // Handle case where window_size > history.len() or window_size is 0
+            return 0.0; // Or some other default behavior, predict 0.0 ratio
         }
 
-        let avg_attendance: f64 = relevant_history.iter()
-            .map(|game| game.total_attendance as f64 / game.total_agents as f64)
-            .sum::<f64>() / relevant_history.len() as f64;
+        let num_relevant_games_with_agents = relevant_history.iter().filter(|game| game.total_agents > 0).count();
+        if num_relevant_games_with_agents == 0 {
+            return 0.0; // Avoid division by zero if no games had agents, predict 0.0 ratio
+        }
 
-        avg_attendance < 0.6
+        let sum_ratios: f64 = relevant_history.iter()
+            .filter(|game| game.total_agents > 0) // Avoid division by zero
+            .map(|game| game.total_attendance as f64 / game.total_agents as f64)
+            .sum::<f64>();
+            
+        sum_ratios / num_relevant_games_with_agents as f64
     }
 
     fn name(&self) -> &'static str {
