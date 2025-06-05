@@ -23,13 +23,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         grid_size: 100,
         neighbor_distance: 2,
         capacity: 60,
-        temperature: 0.0,
-        num_iterations: 1000,
+        temperature: 1.0,
+        num_iterations: 200,
         initial_strategies: vec![
             Box::new(AlwaysGo),
             Box::new(NeverGo),
             Box::new(GoIfLessThanSixty),
-            // Box::new(RandomPolicy),
+            Box::new(RandomPolicy),
             Box::new(MovingAveragePolicy::new(5)),
         ],
     };

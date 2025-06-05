@@ -5,10 +5,12 @@ use ndarray::Array2;
 use std::collections::HashMap;
 use rand::Rng;
 use image::{RgbImage, Rgb};
-use imageproc::drawing::{draw_filled_rect_mut};
+use imageproc::drawing::{draw_filled_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use std::path::Path;
 use indicatif::ProgressBar;
+use rusttype::{Font, Scale};
+use std::fs;
 
 pub struct SimulationConfig {
     pub grid_size: usize,
@@ -58,11 +60,18 @@ impl Simulation {
         }
         println!("-------------------------");
         
-        Self {
+        let sim = Self {
             game,
             config,
             statistics: HashMap::new(),
+        };
+
+        // Visualize initial state (iteration 0)
+        if let Err(e) = sim.visualize_grid_state(0) {
+            eprintln!("Error visualizing initial grid state: {}", e);
         }
+
+        sim
     }
 
     pub fn run_iteration(&mut self, iteration_num: usize) {
@@ -75,9 +84,10 @@ impl Simulation {
         // Adapt strategies
         self.adapt_strategies();
 
-        // Visualize grid state
-        if let Err(e) = self.visualize_grid_state(iteration_num) {
-            eprintln!("Error visualizing grid state: {}", e);
+        // Visualize grid state (iteration_num is 0-indexed for the completed round)
+        // So, after round 0, we save state 1; after round 1, state 2, etc.
+        if let Err(e) = self.visualize_grid_state(iteration_num + 1) {
+            eprintln!("Error visualizing grid state for iteration {}: {}", iteration_num + 1, e);
         }
     }
 
@@ -115,6 +125,7 @@ impl Simulation {
     fn adapt_strategies(&mut self) {
         let grid = self.game.get_grid();
         let mut new_grid = grid.clone();
+        let temperature = self.config.temperature;
 
         for i in 0..self.config.grid_size {
             for j in 0..self.config.grid_size {
@@ -132,7 +143,7 @@ impl Simulation {
                 }
 
                 // Adapt strategy
-                new_grid[[i, j]].adapt_strategy(&neighbors);
+                new_grid[[i, j]].adapt_strategy(&neighbors, temperature);
             }
         }
 
@@ -143,8 +154,30 @@ impl Simulation {
     fn visualize_grid_state(&self, iteration_num: usize) -> Result<(), Box<dyn std::error::Error>> {
         let grid_size = self.config.grid_size;
         let cell_size = 20u32; // Size of each cell in pixels
-        let legend_width = 100u32; // Adjusted width as we are not drawing text
+        let legend_width = 250u32; // Increased width for text
         let padding = 10u32;
+
+        // Attempt to load the specified font for the legend text
+        const FONT_PATH: &str = "/usr/share/fonts/TTF/Arial.TTF";
+
+        let font_data = match fs::read(FONT_PATH) {
+            Ok(data) => Some(data),
+            Err(e) => {
+                eprintln!(
+                    "Warning: Could not load font from {}. Error: {}. Legend text will be missing.",
+                    FONT_PATH, e
+                );
+                None
+            }
+        };
+
+        let font = match font_data {
+            Some(data) => Font::try_from_vec(data),
+            None => None, // Error already printed
+        };
+        
+        let font_scale = Scale::uniform(20.0); // Font size for legend text - Increased from 12.0
+        let text_color = Rgb([0u8, 0u8, 0u8]); // Black for legend text
 
         let policy_names: Vec<String> = self.config.initial_strategies.iter()
             .map(|p| p.name().to_string())
@@ -190,11 +223,12 @@ impl Simulation {
             }
         }
 
-        // Draw legend (color boxes only)
+        // Draw legend with color boxes and text
         let legend_x_start = grid_size as u32 * cell_size + 2 * padding;
         let mut current_y = padding;
         let legend_box_size = cell_size / 2;
         let legend_spacing = 5u32;
+        let text_x_offset = legend_box_size + 5; // Space between color box and text
 
         // Iterate through initial_strategies to maintain order and get names for the map lookup
         for policy_instance in self.config.initial_strategies.iter() {
@@ -207,6 +241,19 @@ impl Simulation {
                     Rect::at(rect_x, rect_y).of_size(legend_box_size, legend_box_size),
                     *color,
                 );
+
+                if let Some(ref f) = font {
+                    draw_text_mut(
+                        &mut img,
+                        text_color,
+                        (rect_x + text_x_offset as i32),
+                        rect_y, // Align text with top of the color box
+                        font_scale,
+                        f,
+                        &policy_name,
+                    );
+                }
+
                 current_y += legend_box_size + legend_spacing;
                 if current_y > img_height - padding - legend_box_size { 
                     eprintln!("Warning: Legend too long to fit in the image.");
