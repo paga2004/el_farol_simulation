@@ -22,6 +22,9 @@
 - agent performance history gets cleared when switching policies.
 
 # Ideas
+## Serialization
+It would be nice to serialize data to a binary format, and to separate visualization from running the code. For this we would have to think what exactly we want to store, and in what format.
+
 ## Evaluation of history of policies locally, instead of performance of agents
 Instead of evaluating each agents success since last policy switch, we could evaluate for each policy, how well it did proportionally to how many times it was used.
 
