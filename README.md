@@ -4,11 +4,11 @@
 - Policies take a vector of past games, output a bool, to go or not to go. Therefore performance is binary too, happy or not.
 
 ### issues
-
 - agents are evaluated on whole history, not just for the tail for which they used the same strategy; probably unintended behavior
 
 - code is a bit janky, and inefficient, but we'll fix that when it becomes a performance issue, for 1000x1000 its fine
 
+- no grid visualisation yet
 ## discrete-clear_history_on_switch
 ### specs
 - agents clear their performance history when switching policies
