@@ -72,6 +72,7 @@ impl Agent {
             cumulative += prob;
             if random_value <= cumulative {
                 self.current_policy = neighbors[i].0.current_policy.clone();
+                self.performance_history = Vec::new();
                 break;
             }
         }

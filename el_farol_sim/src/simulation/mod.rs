@@ -4,6 +4,11 @@ use crate::policy::{Policy, GameResult};
 use ndarray::Array2;
 use std::collections::HashMap;
 use rand::Rng;
+use image::{RgbImage, Rgb};
+use imageproc::drawing::{draw_filled_rect_mut};
+use imageproc::rect::Rect;
+use std::path::Path;
+use indicatif::ProgressBar;
 
 pub struct SimulationConfig {
     pub grid_size: usize,
@@ -36,6 +41,22 @@ impl Simulation {
         }
 
         let game = Game::new(grid, config.capacity);
+
+        // Print policy color mapping for the legend
+        println!("--- Policy Color Legend ---");
+        let policy_names: Vec<String> = config.initial_strategies.iter()
+            .map(|p| p.name().to_string())
+            .collect();
+        let base_colors = [
+            Rgb([255, 0, 0]), Rgb([0, 0, 255]), Rgb([0, 255, 0]), 
+            Rgb([255, 255, 0]), Rgb([255, 0, 255]), Rgb([0, 255, 255]),
+            Rgb([128, 0, 0]), Rgb([0, 0, 128]), Rgb([0, 128, 0]),
+        ];
+        for (i, name) in policy_names.iter().enumerate() {
+            let color = base_colors[i % base_colors.len()];
+            println!("{}: Rgb({}, {}, {})", name, color[0], color[1], color[2]);
+        }
+        println!("-------------------------");
         
         Self {
             game,
@@ -44,7 +65,7 @@ impl Simulation {
         }
     }
 
-    pub fn run_iteration(&mut self) {
+    pub fn run_iteration(&mut self, iteration_num: usize) {
         // Run the game
         let result = self.game.run();
         
@@ -53,11 +74,17 @@ impl Simulation {
         
         // Adapt strategies
         self.adapt_strategies();
+
+        // Visualize grid state
+        if let Err(e) = self.visualize_grid_state(iteration_num) {
+            eprintln!("Error visualizing grid state: {}", e);
+        }
     }
 
-    pub fn run(&mut self) {
-        for _ in 0..self.config.num_iterations {
-            self.run_iteration();
+    pub fn run(&mut self, pb: &ProgressBar) {
+        for i in 0..self.config.num_iterations {
+            self.run_iteration(i);
+            pb.inc(1);
         }
     }
 
@@ -111,6 +138,88 @@ impl Simulation {
 
         // Update grid
         self.game = Game::new(new_grid, self.config.capacity);
+    }
+
+    fn visualize_grid_state(&self, iteration_num: usize) -> Result<(), Box<dyn std::error::Error>> {
+        let grid_size = self.config.grid_size;
+        let cell_size = 20u32; // Size of each cell in pixels
+        let legend_width = 100u32; // Adjusted width as we are not drawing text
+        let padding = 10u32;
+
+        let policy_names: Vec<String> = self.config.initial_strategies.iter()
+            .map(|p| p.name().to_string())
+            .collect();
+        
+        let mut policy_colors: HashMap<String, Rgb<u8>> = HashMap::new();
+        let base_colors = [
+            Rgb([255, 0, 0]), Rgb([0, 0, 255]), Rgb([0, 255, 0]), 
+            Rgb([255, 255, 0]), Rgb([255, 0, 255]), Rgb([0, 255, 255]),
+            Rgb([128, 0, 0]), Rgb([0, 0, 128]), Rgb([0, 128, 0]),
+        ];
+
+        for (i, name) in policy_names.iter().enumerate() {
+            policy_colors.insert(name.clone(), base_colors[i % base_colors.len()]);
+        }
+
+        let img_width = grid_size as u32 * cell_size + legend_width + 3 * padding;
+        let img_height = grid_size as u32 * cell_size + 2 * padding;
+
+        let mut img = RgbImage::new(img_width, img_height);
+
+        // Draw background (white)
+        for pixel in img.pixels_mut() {
+            *pixel = Rgb([255, 255, 255]);
+        }
+
+        // Draw grid cells
+        let grid = self.game.get_grid();
+        for r in 0..grid_size {
+            for c in 0..grid_size {
+                let agent = &grid[[r, c]];
+                let policy_name = agent.current_policy().name().to_string();
+                let color = policy_colors.get(&policy_name).unwrap_or(&Rgb([0, 0, 0])); // Default to black
+
+                let x = (c as u32 * cell_size + padding) as i32;
+                let y = (r as u32 * cell_size + padding) as i32;
+                
+                draw_filled_rect_mut(
+                    &mut img,
+                    Rect::at(x, y).of_size(cell_size, cell_size),
+                    *color,
+                );
+            }
+        }
+
+        // Draw legend (color boxes only)
+        let legend_x_start = grid_size as u32 * cell_size + 2 * padding;
+        let mut current_y = padding;
+        let legend_box_size = cell_size / 2;
+        let legend_spacing = 5u32;
+
+        // Iterate through initial_strategies to maintain order and get names for the map lookup
+        for policy_instance in self.config.initial_strategies.iter() {
+            let policy_name = policy_instance.name().to_string();
+            if let Some(color) = policy_colors.get(&policy_name) {
+                let rect_x = legend_x_start as i32;
+                let rect_y = current_y as i32;
+                draw_filled_rect_mut(
+                    &mut img,
+                    Rect::at(rect_x, rect_y).of_size(legend_box_size, legend_box_size),
+                    *color,
+                );
+                current_y += legend_box_size + legend_spacing;
+                if current_y > img_height - padding - legend_box_size { 
+                    eprintln!("Warning: Legend too long to fit in the image.");
+                    break;
+                }
+            }
+        }
+        
+        let output_path_str = format!("output/grid_states/state_{:04}.png", iteration_num);
+        let output_path = Path::new(&output_path_str);
+        img.save(output_path)?;
+
+        Ok(())
     }
 
     pub fn get_statistics(&self) -> &HashMap<String, Vec<f64>> {
