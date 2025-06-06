@@ -1,10 +1,9 @@
 use crate::agent::Agent;
-use crate::policy::GameResult;
 use ndarray::Array2;
 
 pub struct Game {
     grid: Array2<Agent>,
-    history: Vec<GameResult>,
+    history: Vec<f64>,
 }
 
 impl Game {
@@ -15,19 +14,17 @@ impl Game {
         }
     }
 
-    pub fn run(&mut self) -> GameResult {
+    pub fn run(&mut self) -> f64 {
         let total_agents = self.grid.len();
-        let mut attendance = 0;
-        // agent_decisions is not strictly needed anymore if we don't use it for performance update directly
-        // However, if there was any other part of the code relying on individual decisions,
-        // it might be kept. For this refactor, it seems unused after the first loop.
-        // let mut agent_decisions: Vec<bool> = Vec::with_capacity(total_agents);
 
-        // Collect decisions from all agents
-        for agent in self.grid.iter_mut() {
-            let decision_went_to_bar = agent.decide(&self.history);
-            // agent_decisions.push(decision_went_to_bar); // No longer strictly needed for performance
-            if decision_went_to_bar {
+        let predictions: Vec<f64> = self.grid.iter()
+            .map(|agent| agent.current_policy().decide(&self.history))
+            .collect();
+
+        let mut attendance = 0;
+        for (agent, &prediction) in self.grid.iter_mut().zip(predictions.iter()) {
+            agent.last_prediction = Some(prediction);
+            if prediction < 0.6 {
                 attendance += 1;
             }
         }
@@ -45,12 +42,8 @@ impl Game {
         }
 
         // Record game result
-        let result = GameResult {
-            total_attendance: attendance,
-            total_agents,
-        };
-        self.history.push(result);
-        result
+        self.history.push(actual_attendance_ratio);
+        actual_attendance_ratio
     }
 
     pub fn get_grid(&self) -> &Array2<Agent> {
@@ -81,12 +74,11 @@ mod tests {
             Agent::new(Box::new(AlwaysGo))  // AlwaysGo predicts 0.0 (ratio), decides to go
         ]];
         let mut game = Game::new(grid);
-        let result = game.run();
-        assert_eq!(result.total_attendance, 2); // Both go
-        assert_eq!(result.total_agents, 2);
+        let ratio = game.run();
+        assert_eq!(ratio, 1.0); // Both go, so ratio is 2/2 = 1.0
 
         // Check agent performance update
-        // Actual attendance ratio = 2 / 2 = 1.0
+        // Actual attendance ratio = 1.0
         // Agents predicted 0.0. Error = |0.0 - 1.0| = 1.0
         // Performance = (1.0 - 1.0) * 100.0 = 0.0
         for agent in game.grid.iter() {

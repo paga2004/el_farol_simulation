@@ -1,6 +1,6 @@
 use crate::agent::Agent;
 use crate::game::Game;
-use crate::policy::{Policy, GameResult};
+use crate::policy::Policy;
 use ndarray::Array2;
 use std::collections::HashMap;
 use rand::Rng;
@@ -33,14 +33,17 @@ impl Simulation {
         let mut rng = rand::thread_rng();
         let mut grid: Array2<Agent>;
 
+        if config.initial_strategies.is_empty() {
+            panic!("Initial strategies cannot be empty for random setup.");
+        }
+
         if config.start_random {
             // Initialize with a temporary agent for Array2::from_elem, then fill randomly
             grid = Array2::from_elem((config.grid_size, config.grid_size), 
                 Agent::new(config.initial_strategies[0].clone())); // Placeholder
             
-            if config.initial_strategies.is_empty() {
-                panic!("Initial strategies cannot be empty for random setup.");
-            }
+           
+
 
             for i in 0..config.grid_size {
                 for j in 0..config.grid_size {
@@ -111,7 +114,7 @@ impl Simulation {
         // Print policy color mapping for the legend
         println!("--- Policy Color Legend ---");
         let policy_names: Vec<String> = config.initial_strategies.iter()
-            .map(|p| p.name().to_string())
+            .map(|p| p.name())
             .collect();
         let base_colors = [
             Rgb([255, 0, 0]), Rgb([0, 0, 255]), Rgb([0, 255, 0]), 
@@ -141,13 +144,13 @@ impl Simulation {
     pub fn run_iteration(&mut self, adaptation_step_num: usize) {
         for _round in 0..self.config.rounds_per_update {
             // Run a single game round
-            let result = self.game.run();
+            let ratio = self.game.run();
             
             // Update statistics for this game round
             // Note: update_statistics collects data per game round. If you later want statistics
             // per adaptation step (e.g., average performance of agents in that step), 
             // that would require additional logic.
-            self.update_statistics(&result);
+            self.update_statistics(ratio);
         }
         
         // Adapt strategies based on the performance over the last rounds_per_update
@@ -171,9 +174,8 @@ impl Simulation {
         }
     }
 
-    fn update_statistics(&mut self, result: &GameResult) {
+    fn update_statistics(&mut self, attendance_ratio: f64) {
         // Update attendance statistics
-        let attendance_ratio = result.total_attendance as f64 / result.total_agents as f64;
         self.statistics
             .entry("attendance_ratio".to_string())
             .or_insert_with(Vec::new)
@@ -182,7 +184,7 @@ impl Simulation {
         // Update strategy distribution
         let mut strategy_counts: HashMap<String, usize> = HashMap::new();
         for agent in self.game.get_grid().iter() {
-            let strategy_name = agent.current_policy().name().to_string();
+            let strategy_name = agent.current_policy().name();
             *strategy_counts.entry(strategy_name).or_insert(0) += 1;
         }
 
@@ -205,12 +207,12 @@ impl Simulation {
                 let mut neighbors = Vec::new();
                 
                 // Find neighbors within Manhattan distance
-                for ni in 0..self.config.grid_size {
-                    for nj in 0..self.config.grid_size {
-                        let distance = (i as isize - ni as isize).abs() + 
-                                     (j as isize - nj as isize).abs();
-                        if distance <= self.config.neighbor_distance as isize {
-                            neighbors.push((&grid[[ni, nj]], grid[[ni, nj]].performance()));
+                let neighbor_distance = self.config.neighbor_distance as isize;
+                for ni in (i as isize - neighbor_distance).max(0)..=(i as isize + neighbor_distance).min(self.config.grid_size as isize - 1) {
+                    for nj in (j as isize - neighbor_distance).max(0)..=(j as isize + neighbor_distance).min(self.config.grid_size as isize - 1) {
+                        let distance = (i as isize - ni).abs() + (j as isize - nj).abs();
+                        if distance <= neighbor_distance {
+                            neighbors.push((&grid[[ni as usize, nj as usize]], grid[[ni as usize, nj as usize]].performance()));
                         }
                     }
                 }
@@ -260,7 +262,7 @@ impl Simulation {
         let text_color = Rgb([0u8, 0u8, 0u8]); // Black for legend text
 
         let policy_names: Vec<String> = self.config.initial_strategies.iter()
-            .map(|p| p.name().to_string())
+            .map(|p| p.name())
             .collect();
         
         let mut policy_colors: HashMap<String, Rgb<u8>> = HashMap::new();
@@ -289,7 +291,7 @@ impl Simulation {
         for r in 0..grid_size {
             for c in 0..grid_size {
                 let agent = &grid[[r, c]];
-                let policy_name = agent.current_policy().name().to_string();
+                let policy_name = agent.current_policy().name();
                 let color = policy_colors.get(&policy_name).unwrap_or(&Rgb([0, 0, 0])); // Default to black
 
                 let x = (c as u32 * cell_size + padding) as i32;
@@ -312,7 +314,7 @@ impl Simulation {
 
         // Iterate through initial_strategies to maintain order and get names for the map lookup
         for policy_instance in self.config.initial_strategies.iter() {
-            let policy_name = policy_instance.name().to_string();
+            let policy_name = policy_instance.name();
             if let Some(color) = policy_colors.get(&policy_name) {
                 let rect_x = legend_x_start as i32;
                 let rect_y = current_y as i32;
