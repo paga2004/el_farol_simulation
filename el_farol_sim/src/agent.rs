@@ -1,29 +1,22 @@
 use crate::policy::{Policy, GameResult};
 use std::fmt::Debug;
-use serde::{Serialize, Deserialize};
 use rand::Rng;
 
 
 #[derive(Debug, Clone)]
 pub struct Agent {
-    position: (usize, usize),
     current_policy: Box<dyn Policy>,
-    performance_history: Vec<f64>, // Stores absolute prediction error
-    last_prediction: Option<f64>, // Stores the last prediction made by the policy
+    pub performance_history: Vec<f64>, // Stores absolute prediction error
+    pub last_prediction: Option<f64>, // Stores the last prediction made by the policy
 }
 
 impl Agent {
-    pub fn new(position: (usize, usize), initial_policy: Box<dyn Policy>) -> Self {
+    pub fn new(initial_policy: Box<dyn Policy>) -> Self {
         Self {
-            position,
             current_policy: initial_policy,
             performance_history: Vec::new(),
             last_prediction: None,
         }
-    }
-
-    pub fn position(&self) -> (usize, usize) {
-        self.position
     }
 
     pub fn decide(&mut self, history: &[GameResult]) -> bool {
@@ -122,6 +115,10 @@ impl Agent {
             }
         }
     }
+
+    pub fn clear_performance_history(&mut self) {
+        self.performance_history.clear();
+    }
 }
 
 #[cfg(test)]
@@ -131,13 +128,13 @@ mod tests {
 
     #[test]
     fn test_agent_creation() {
-        let agent = Agent::new((0, 0), Box::new(AlwaysGo));
-        assert_eq!(agent.position(), (0, 0));
+        let agent = Agent::new(Box::new(AlwaysGo));
+        assert_eq!(agent.current_policy().name(), "AlwaysGo");
     }
 
     #[test]
     fn test_agent_performance() {
-        let mut agent = Agent::new((0, 0), Box::new(AlwaysGo)); // AlwaysGo predicts 0.0 (ratio)
+        let mut agent = Agent::new(Box::new(AlwaysGo)); // AlwaysGo predicts 0.0 (ratio)
         
         // Round 1: Agent predicts 0.0. Actual attendance is 0.2 (20% ratio).
         agent.last_prediction = Some(0.0);
@@ -155,18 +152,18 @@ mod tests {
         assert_eq!(agent.performance(), 55.0);
 
         // Test with empty history
-        let agent_no_history = Agent::new((0,0), Box::new(NeverGo));
+        let agent_no_history = Agent::new(Box::new(NeverGo));
         assert_eq!(agent_no_history.performance(), 0.0);
 
         // Test max error results in 0 performance
-        let mut agent_max_error = Agent::new((0,0), Box::new(AlwaysGo));
+        let mut agent_max_error = Agent::new(Box::new(AlwaysGo));
         agent_max_error.last_prediction = Some(0.0);
         agent_max_error.update_performance(1.0); // prediction 0.0, actual 1.0 -> error 1.0
         // Performance = (1.0 - 1.0) * 100.0 = 0.0
         assert_eq!(agent_max_error.performance(), 0.0);
 
         // Test zero error results in 100 performance
-        let mut agent_zero_error = Agent::new((0,0), Box::new(AlwaysGo));
+        let mut agent_zero_error = Agent::new(Box::new(AlwaysGo));
         agent_zero_error.last_prediction = Some(0.0);
         agent_zero_error.update_performance(0.0); // prediction 0.0, actual 0.0 -> error 0.0
         // Performance = (1.0 - 0.0) * 100.0 = 100.0

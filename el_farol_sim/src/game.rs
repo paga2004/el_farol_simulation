@@ -4,15 +4,13 @@ use ndarray::Array2;
 
 pub struct Game {
     grid: Array2<Agent>,
-    capacity: usize,
     history: Vec<GameResult>,
 }
 
 impl Game {
-    pub fn new(grid: Array2<Agent>, capacity: usize) -> Self {
+    pub fn new(grid: Array2<Agent>) -> Self {
         Self {
             grid,
-            capacity,
             history: Vec::new(),
         }
     }
@@ -55,20 +53,8 @@ impl Game {
         result
     }
 
-    pub fn get_attendance(&self) -> usize {
-        if let Some(last_game) = self.history.last() {
-            last_game.total_attendance
-        } else {
-            0
-        }
-    }
-
     pub fn get_grid(&self) -> &Array2<Agent> {
         &self.grid
-    }
-
-    pub fn get_history(&self) -> &[GameResult] {
-        &self.history
     }
 }
 
@@ -81,20 +67,20 @@ mod tests {
     #[test]
     fn test_game_creation() {
         let grid = array![[
-            Agent::new((0, 0), Box::new(AlwaysGo)),
-            Agent::new((0, 1), Box::new(AlwaysGo))
+            Agent::new(Box::new(AlwaysGo)),
+            Agent::new(Box::new(AlwaysGo))
         ]];
-        let game = Game::new(grid, 1);
-        assert_eq!(game.get_attendance(), 0);
+        let game = Game::new(grid);
+        assert!(game.history.is_empty());
     }
 
     #[test]
     fn test_game_run() {
         let grid = array![[
-            Agent::new((0, 0), Box::new(AlwaysGo)), // AlwaysGo predicts 0.0 (ratio), decides to go
-            Agent::new((0, 1), Box::new(AlwaysGo))  // AlwaysGo predicts 0.0 (ratio), decides to go
+            Agent::new(Box::new(AlwaysGo)), // AlwaysGo predicts 0.0 (ratio), decides to go
+            Agent::new(Box::new(AlwaysGo))  // AlwaysGo predicts 0.0 (ratio), decides to go
         ]];
-        let mut game = Game::new(grid, 1); // Capacity 1
+        let mut game = Game::new(grid);
         let result = game.run();
         assert_eq!(result.total_attendance, 2); // Both go
         assert_eq!(result.total_agents, 2);

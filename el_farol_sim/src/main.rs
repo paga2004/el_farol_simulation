@@ -21,17 +21,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Create simulation configuration
     let config = SimulationConfig {
         grid_size: 100,
-        neighbor_distance: 2,
-        capacity: 60,
-        temperature: 0.5,
-        num_iterations: 200,
+        neighbor_distance: 1,
+        temperature: 1.0,
+        num_iterations: 1000,
+        rounds_per_update: 10,
         initial_strategies: vec![
             Box::new(AlwaysGo),
             Box::new(NeverGo),
             Box::new(GoIfLessThanSixty),
             Box::new(RandomPolicy),
-            Box::new(MovingAveragePolicy::new(5)),
+            Box::new(MovingAveragePolicy::new(3))
         ],
+        start_random: false,
     };
 
     // Create and run simulation
