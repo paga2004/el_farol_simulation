@@ -45,9 +45,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         base_output_dir.push("output");
     }
 
-    let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let folder_name = &simulation_data.config.name;
-    let experiment_dir = base_output_dir.join(format!("{}_{}", folder_name, timestamp));
+    let experiment_dir = base_output_dir.join(folder_name);
     fs::create_dir_all(&experiment_dir)?;
 
     let grid_states_dir = experiment_dir.join("grid_states");

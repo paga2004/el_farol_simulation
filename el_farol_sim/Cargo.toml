@@ -34,7 +34,7 @@ anyhow = "1.0"
 rayon = "1.8"  # For parallel processing
 indicatif = "0.17.8"
 clap = { version = "4.5.4", features = ["derive"] }
-chrono = "0.4"
+chrono = "0.4.38"
 liblzma = { version = "0.4.1", features = ["num_cpus", "parallel"] }
 toml = "0.8.12"
 ab_glyph = "0.2.22"

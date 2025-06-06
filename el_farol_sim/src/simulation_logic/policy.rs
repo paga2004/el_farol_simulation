@@ -56,11 +56,11 @@ impl Policy for NeverGo {
     }
 }
 
-/// Goes if less than 60% went last time
+/// Predicts attendance will be the same as yesterday
 #[derive(Debug, Clone, Copy)]
-pub struct GoIfLessThanSixty;
+pub struct PredictFromYesterday;
 
-impl Policy for GoIfLessThanSixty {
+impl Policy for PredictFromYesterday {
     fn decide(&self, history: &[f64]) -> f64 {
         if let Some(last_ratio) = history.last() {
             *last_ratio
@@ -70,7 +70,21 @@ impl Policy for GoIfLessThanSixty {
     }
 
     fn name(&self) -> String {
-        "Go If < 60%".to_string()
+        "Predict from yesterday".to_string()
+    }
+}
+
+/// Predicts attendance will be the same as the day before yesterday
+#[derive(Debug, Clone, Copy)]
+pub struct PredictFromDayBeforeYesterday;
+
+impl Policy for PredictFromDayBeforeYesterday {
+    fn decide(&self, history: &[f64]) -> f64 {
+        history.iter().rev().nth(1).copied().unwrap_or(0.0)
+    }
+
+    fn name(&self) -> String {
+        "Predict from day before yesterday".to_string()
     }
 }
 

@@ -1,19 +1,21 @@
+use dotenvy;
 use el_farol_lib::simulation_logic::{
     policy::{
-        AlwaysGo, GoIfLessThanSixty, MovingAveragePolicy, NeverGo, RandomPolicy,
+        AlwaysGo, MovingAveragePolicy, NeverGo, PredictFromDayBeforeYesterday,
+        PredictFromYesterday, RandomPolicy,
     },
     simulation::{Simulation, SimulationConfig},
 };
 use el_farol_lib::{SerializableSimulationConfig, SimulationData};
 use indicatif::{ProgressBar, ProgressStyle};
+use liblzma::write::XzEncoder;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use liblzma::write::XzEncoder;
-use dotenvy;
+use chrono;
 
 fn main() -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
@@ -21,27 +23,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
     let initial_strategies: Vec<Box<dyn el_farol_lib::simulation_logic::policy::Policy>> = vec![
-        Box::new(AlwaysGo),
-        Box::new(NeverGo),
-        Box::new(GoIfLessThanSixty),
-        Box::new(RandomPolicy),
-        Box::new(MovingAveragePolicy::<3>),
-        Box::new(MovingAveragePolicy::<5>),
-        Box::new(MovingAveragePolicy::<10>),
+        // Box::new(AlwaysGo),
+        // Box::new(NeverGo),
+        Box::new(PredictFromYesterday),
+        Box::new(PredictFromDayBeforeYesterday),
+        // Box::new(RandomPolicy),
+        // Box::new(MovingAveragePolicy::<3>),
+        // Box::new(MovingAveragePolicy::<5>),
+        // Box::new(MovingAveragePolicy::<10>),
     ];
     let strategy_names: Vec<String> = initial_strategies.iter().map(|p| p.name()).collect();
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "test_simulation".to_string(),
-        description: "this is a test run".to_string(),
+        name: "yesterday_vs_day_before".to_string(),
+        description: "A simulation where agents predict attendance based on yesterday's or the day before yesterday's results.".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
         temperature: 1.0,
         num_iterations: 1000,
         rounds_per_update: 10,
         initial_strategies,
-        start_random: false,
+        start_random: true,
     };
 
     let num_iterations = config.num_iterations;
@@ -50,7 +53,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let pb = ProgressBar::new(num_iterations as u64);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")?
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})",
+            )?
             .progress_chars("#>-"),
     );
 
@@ -84,6 +89,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Serialize and save simulation data
     let encoded = bincode::serialize(&simulation_data)?;
 
+    let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+    let filename = format!("{}_{}.bin.xz", config.name, timestamp);
+
     let mut output_path = PathBuf::new();
     if let Ok(val) = std::env::var("EL_FARO_HOME") {
         output_path.push(val);
@@ -91,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     fs::create_dir_all(&output_path)?;
-    output_path.push(format!("{}.bin.xz", config.name));
+    output_path.push(filename);
 
     let file = File::create(&output_path)?;
     let mut encoder = XzEncoder::new_parallel(file, 6);
