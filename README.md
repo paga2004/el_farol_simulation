@@ -1,17 +1,18 @@
-# test_simulation
+# all-policies-200
 
-test test test
+A simulation till 200 iterations with all available policies, ret rate 0.02
 
 ## Configuration
 
 ```
-name = "test_simulation"
-description = "test test test"
+name = "all-policies-200"
+description = "A simulation till 200 iterations with all available policies, ret rate 0.02"
 grid_size = 100
 neighbor_distance = 1
 temperature = 1.0
-num_iterations = 1000
-rounds_per_update = 10
+policy_retention_rate = 0.02
+num_iterations = 200
+rounds_per_update = 3
 initial_strategies = [
     "Always Go",
     "Never Go",
@@ -21,6 +22,20 @@ initial_strategies = [
     "Moving Average (3)",
     "Moving Average (5)",
     "Moving Average (10)",
+    "Full History Average",
+    "Even History Average",
+    "Complex Formula",
+    "Drunkard",
+    "Stupid Nerd",
+    "Uniform [0..1)",
+    "Weighted History",
+    "Sliding Weighted Average (5)",
+    "Exponential Moving Average (a=0.1)",
+    "Exponential Moving Average (a=0.5)",
+    "Exponential Moving Average (a=0.9)",
+    "Generalized Mean (m=5, r=1)",
+    "Generalized Mean (m=5, r=2)",
+    "Generalized Mean (m=5, r=-1)",
 ]
 start_random = true
 
@@ -34,8 +49,8 @@ start_random = true
 ## States
 
 ![state_0000.png](readme_pictures/state_0000.png)
-![state_0249.png](readme_pictures/state_0249.png)
-![state_0499.png](readme_pictures/state_0499.png)
-![state_0749.png](readme_pictures/state_0749.png)
-![state_0999.png](readme_pictures/state_0999.png)
+![state_0049.png](readme_pictures/state_0049.png)
+![state_0099.png](readme_pictures/state_0099.png)
+![state_0149.png](readme_pictures/state_0149.png)
+![state_0199.png](readme_pictures/state_0199.png)
 
