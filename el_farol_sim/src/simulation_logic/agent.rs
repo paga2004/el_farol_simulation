@@ -1,6 +1,6 @@
-use crate::policy::Policy;
-use std::fmt::Debug;
+use super::policy::Policy;
 use rand::Rng;
+use std::fmt::Debug;
 
 
 #[derive(Debug, Clone)]
@@ -105,7 +105,7 @@ impl Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::{AlwaysGo, NeverGo};
+    use super::super::policy::{AlwaysGo, NeverGo};
 
     #[test]
     fn test_agent_performance() {

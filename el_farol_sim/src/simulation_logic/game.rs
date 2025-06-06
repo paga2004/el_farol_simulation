@@ -1,9 +1,9 @@
-use crate::agent::Agent;
+use super::agent::Agent;
 use ndarray::Array2;
 
 pub struct Game {
     grid: Array2<Agent>,
-    history: Vec<f64>,
+    pub history: Vec<f64>,
 }
 
 impl Game {
@@ -54,7 +54,7 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy::AlwaysGo;
+    use super::super::policy::AlwaysGo;
     use ndarray::array;
 
     #[test]
