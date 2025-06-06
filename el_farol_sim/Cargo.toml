@@ -5,15 +5,28 @@ edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "A simulation of the El Farol Bar problem in a grid-based environment"
 
+[lib]
+name = "el_farol_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "simulation"
+path = "src/bin/simulation.rs"
+
+[[bin]]
+name = "visualizer"
+path = "src/bin/visualizer.rs"
+
 [dependencies]
 rand = "0.8.5"
-ndarray = "0.15.6"
+ndarray = { version = "0.15.6", features = ["serde"] }
 plotters = "0.3.5"
 image = { version = "0.24", features = ["png"] }
 imageproc = "0.23"
 rusttype = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+bincode = "1.3.3"
 log = "0.4"
 env_logger = "0.10"
 thiserror = "1.0"
