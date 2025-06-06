@@ -138,13 +138,7 @@ impl Simulation {
         sim
     }
 
-    pub fn run_iteration(&mut self) -> Frame {
-        for _round in 0..self.config.rounds_per_update {
-            self.game.run();
-        }
-        self.adapt_strategies();
-
-        
+    pub fn get_current_frame(&self) -> Frame {
         let grid = self.game.get_grid();
         let policy_ids = grid.mapv(|agent| {
             let name = agent.current_policy().name();
@@ -153,12 +147,19 @@ impl Simulation {
         let predictions = grid.mapv(|agent| agent.last_prediction.unwrap_or(0.0));
         let attendance_ratio = *self.game.history.last().unwrap_or(&0.0);
 
-
         Frame {
             policy_ids,
             predictions,
             attendance_ratio,
         }
+    }
+
+    pub fn run_iteration(&mut self) -> Frame {
+        for _round in 0..self.config.rounds_per_update {
+            self.game.run();
+        }
+        self.adapt_strategies();
+        self.get_current_frame()
     }
 
     fn adapt_strategies(&mut self) {
