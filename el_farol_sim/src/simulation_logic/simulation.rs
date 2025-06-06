@@ -1,12 +1,15 @@
 use super::agent::Agent;
 use super::game::Game;
 use super::policy::Policy;
-use crate::Frame;
+use crate::{Frame, StrategyId};
 use ndarray::Array2;
 use rand::Rng;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct SimulationConfig {
+    pub name: String,
+    pub description: String,
     pub grid_size: usize,
     pub neighbor_distance: usize,
     pub temperature: f64,
@@ -20,6 +23,7 @@ pub struct Simulation {
     game: Game,
     config: SimulationConfig,
     statistics: HashMap<String, Vec<f64>>,
+    strategy_map: HashMap<String, StrategyId>,
 }
 
 impl Simulation {
@@ -31,11 +35,20 @@ impl Simulation {
             panic!("Initial strategies cannot be empty for random setup.");
         }
 
+        let strategy_map: HashMap<String, StrategyId> = config
+            .initial_strategies
+            .iter()
+            .enumerate()
+            .map(|(i, policy)| (policy.name(), i as StrategyId))
+            .collect();
+
         if config.start_random {
             // Initialize with a temporary agent for Array2::from_elem, then fill randomly
-            grid = Array2::from_elem((config.grid_size, config.grid_size), 
-                Agent::new(config.initial_strategies[0].clone())); // Placeholder
-            
+            grid = Array2::from_elem(
+                (config.grid_size, config.grid_size),
+                Agent::new(config.initial_strategies[0].clone()),
+            ); // Placeholder
+
             for i in 0..config.grid_size {
                 for j in 0..config.grid_size {
                     let strategy_idx = rng.gen_range(0..config.initial_strategies.len());
@@ -46,7 +59,9 @@ impl Simulation {
         } else {
             // Specific "Never Go with corners" setup
             let base_policy_name = "Never Go";
-            let base_policy = config.initial_strategies.iter()
+            let base_policy = config
+                .initial_strategies
+                .iter()
                 .find(|p| p.name() == base_policy_name)
                 .map(|p| p.clone_box())
                 .unwrap_or_else(|| {
@@ -59,18 +74,22 @@ impl Simulation {
                     config.initial_strategies[0].clone_box()
                 });
 
-            let other_policies: Vec<Box<dyn Policy>> = config.initial_strategies.iter()
+            let other_policies: Vec<Box<dyn Policy>> = config
+                .initial_strategies
+                .iter()
                 .filter(|p| p.name() != base_policy.name()) // Filter out the base policy by name
                 .map(|p| p.clone_box())
                 .collect();
 
             // Initialize all cells with the base policy
-            grid = Array2::from_elem((config.grid_size, config.grid_size), 
-                Agent::new(base_policy.clone_box())); // Placeholder coords, actual in loop
+            grid = Array2::from_elem(
+                (config.grid_size, config.grid_size),
+                Agent::new(base_policy.clone_box()),
+            ); // Placeholder coords, actual in loop
 
             for r in 0..config.grid_size {
                 for c in 0..config.grid_size {
-                    grid[[r,c]] = Agent::new(base_policy.clone_box());
+                    grid[[r, c]] = Agent::new(base_policy.clone_box());
                 }
             }
 
@@ -78,21 +97,27 @@ impl Simulation {
                 let gs = config.grid_size;
                 if gs > 0 {
                     // Top-left
-                    grid[[0, 0]] = Agent::new(other_policies[0 % other_policies.len()].clone_box());
-                    
+                    grid[[0, 0]] =
+                        Agent::new(other_policies[0 % other_policies.len()].clone_box());
+
                     // Top-right
                     if gs > 1 {
-                        grid[[0, gs - 1]] = Agent::new(other_policies[1 % other_policies.len()].clone_box());
+                        grid[[0, gs - 1]] =
+                            Agent::new(other_policies[1 % other_policies.len()].clone_box());
                     }
-                    
+
                     // Bottom-left
-                    if gs > 1 { // Also implies gs > 0 already checked
-                        grid[[gs - 1, 0]] = Agent::new(other_policies[2 % other_policies.len()].clone_box());
+                    if gs > 1 {
+                        // Also implies gs > 0 already checked
+                        grid[[gs - 1, 0]] =
+                            Agent::new(other_policies[2 % other_policies.len()].clone_box());
                     }
 
                     // Bottom-right
-                    if gs > 1 { // Also implies gs > 0 already checked
-                        grid[[gs - 1, gs - 1]] = Agent::new(other_policies[3 % other_policies.len()].clone_box());
+                    if gs > 1 {
+                        // Also implies gs > 0 already checked
+                        grid[[gs - 1, gs - 1]] =
+                            Agent::new(other_policies[3 % other_policies.len()].clone_box());
                     }
                 }
             } else {
@@ -102,26 +127,11 @@ impl Simulation {
 
         let game = Game::new(grid);
 
-        // Print policy color mapping for the legend
-        println!("--- Policy Color Legend ---");
-        let policy_names: Vec<String> = config.initial_strategies.iter()
-            .map(|p| p.name())
-            .collect();
-        let base_colors = [
-            (255, 0, 0), (0, 0, 255), (0, 255, 0), 
-            (255, 255, 0), (255, 0, 255), (0, 255, 255),
-            (128, 0, 0), (0, 0, 128), (0, 128, 0),
-        ];
-        for (i, name) in policy_names.iter().enumerate() {
-            let color = base_colors[i % base_colors.len()];
-            println!("{}: Rgb({}, {}, {})", name, color.0, color.1, color.2);
-        }
-        println!("-------------------------");
-        
         let sim = Self {
             game,
             config,
             statistics: HashMap::new(),
+            strategy_map,
         };
 
         sim
@@ -135,12 +145,15 @@ impl Simulation {
         self.adapt_strategies();
 
         let grid = self.game.get_grid();
-        let policy_names = grid.mapv(|agent| agent.current_policy().name());
+        let policy_ids = grid.mapv(|agent| {
+            let name = agent.current_policy().name();
+            *self.strategy_map.get(&name).unwrap() as StrategyId
+        });
         let predictions = grid.mapv(|agent| agent.last_prediction.unwrap_or(0.0));
         let attendance_ratio = *self.game.history.last().unwrap_or(&0.0);
 
         Frame {
-            policy_names,
+            policy_ids,
             predictions,
             attendance_ratio,
         }
@@ -195,6 +208,8 @@ mod tests {
     #[test]
     fn test_simulation_creation() {
         let config = SimulationConfig {
+            name: "test".to_string(),
+            description: "test description".to_string(),
             grid_size: 2,
             neighbor_distance: 1,
             temperature: 1.0,

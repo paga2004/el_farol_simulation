@@ -6,7 +6,7 @@ use imageproc::drawing::{draw_filled_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use indicatif::{ProgressBar, ProgressStyle};
 use plotters::prelude::*;
-use rusttype::{Font, Scale};
+use ab_glyph::{FontArc, FontVec};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -14,66 +14,67 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use liblzma::read::XzDecoder;
+use toml;
+use dotenvy;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Path to the simulation data file
     input_file: PathBuf,
-    /// Optional name for the experiment folder
-    #[arg(short, long)]
-    name: Option<String>,
-    /// Flag to disable video creation
+    /// Flag to enable video creation
     #[arg(long)]
-    no_video: bool,
+    video: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    dotenvy::dotenv().ok();
     let args = Args::parse();
-    let mut file = File::open(&args.input_file)?;
-    let mut encoded = Vec::new();
-    file.read_to_end(&mut encoded)?;
-    let simulation_data: SimulationData = bincode::deserialize(&encoded)?;
+    let file = File::open(&args.input_file)?;
+    let mut decompressor = XzDecoder::new(file);
+    let mut decoded = Vec::new();
+    decompressor.read_to_end(&mut decoded)?;
+    let simulation_data: SimulationData = bincode::deserialize(&decoded)?;
 
-    let output_dir = "output";
-    let grid_states_dir = format!("{}/grid_states", output_dir);
-    fs::create_dir_all(&grid_states_dir)?;
-
-    visualize_simulation(&simulation_data, &grid_states_dir)?;
-
-    let video_path = format!("{}/simulation.mp4", output_dir);
-    if !args.no_video {
-        create_video(&grid_states_dir, &video_path)?;
+    let mut base_output_dir = PathBuf::new();
+    if let Ok(val) = std::env::var("EL_FARO_HOME") {
+        base_output_dir.push(val);
+        base_output_dir.push("visualisation");
+    } else {
+        base_output_dir.push("output");
     }
-
-    println!("Please enter a description for this experiment:");
-    let mut description = String::new();
-    io::stdin().read_line(&mut description)?;
 
     let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-    let folder_name = args.name.unwrap_or_else(|| "experiment".to_string());
-    let experiment_dir = format!("{}/{}_{}", output_dir, folder_name, timestamp);
+    let folder_name = &simulation_data.config.name;
+    let experiment_dir = base_output_dir.join(format!("{}_{}", folder_name, timestamp));
     fs::create_dir_all(&experiment_dir)?;
 
-    fs::write(format!("{}/description.txt", experiment_dir), description)?;
+    let grid_states_dir = experiment_dir.join("grid_states");
+    fs::create_dir_all(&grid_states_dir)?;
 
-    let attendance_plot_path = format!("{}/attendance.png", output_dir);
-    let strategy_plot_path = format!("{}/strategy_distribution.png", output_dir);
+    visualize_simulation(&simulation_data, &grid_states_dir.to_string_lossy(), &experiment_dir.to_string_lossy())?;
 
-    fs::rename(
-        attendance_plot_path,
-        format!("{}/attendance.png", &experiment_dir),
-    )?;
-    fs::rename(
-        strategy_plot_path,
-        format!("{}/strategy_distribution.png", &experiment_dir),
-    )?;
-    if !args.no_video {
-        fs::rename(&video_path, format!("{}/simulation.mp4", &experiment_dir))?;
+    if args.video {
+        let video_path = experiment_dir.join("simulation.mp4");
+        create_video(&grid_states_dir.to_string_lossy(), &video_path.to_string_lossy())?;
     }
-    fs::rename(grid_states_dir, format!("{}/grid_states", &experiment_dir))?;
 
-    println!("Experiment data saved to: {}", experiment_dir);
+    fs::write(experiment_dir.join("description.txt"), &simulation_data.config.description)?;
+
+    let sim_conf_path = experiment_dir.join("sim.conf");
+    match toml::to_string_pretty(&simulation_data.config) {
+        Ok(conf_str) => {
+            if let Err(e) = fs::write(&sim_conf_path, conf_str) {
+                eprintln!("Failed to write sim.conf to {}: {}", sim_conf_path.display(), e);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to serialize simulation config to TOML: {}", e);
+        }
+    }
+
+    println!("Experiment data saved to: {}", experiment_dir.display());
 
     Ok(())
 }
@@ -106,8 +107,9 @@ fn create_video(frames_dir: &str, output_path: &str) -> Result<(), Box<dyn Error
 fn visualize_simulation(
     simulation_data: &SimulationData,
     grid_states_dir: &str,
+    plots_dir: &str,
 ) -> Result<(), Box<dyn Error>> {
-    plot_statistics(simulation_data, "output")?;
+    plot_statistics(simulation_data, plots_dir)?;
     let pb = ProgressBar::new(simulation_data.frames.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
@@ -119,7 +121,7 @@ fn visualize_simulation(
         visualize_grid_state(
             frame,
             i,
-            &simulation_data.initial_strategies,
+            &simulation_data.config.initial_strategies,
             grid_states_dir,
         )?;
         pb.inc(1);
@@ -133,8 +135,8 @@ fn plot_statistics(
     output_dir: &str,
 ) -> Result<(), Box<dyn Error>> {
     let mut statistics: HashMap<String, Vec<f64>> = HashMap::new();
-    let total_agents = (simulation_data.frames[0].policy_names.nrows()
-        * simulation_data.frames[0].policy_names.ncols()) as f64;
+    let total_agents = (simulation_data.frames[0].policy_ids.nrows()
+        * simulation_data.frames[0].policy_ids.ncols()) as f64;
 
     for frame in &simulation_data.frames {
         statistics
@@ -143,7 +145,8 @@ fn plot_statistics(
             .push(frame.attendance_ratio);
 
         let mut strategy_counts: HashMap<String, usize> = HashMap::new();
-        for policy_name in frame.policy_names.iter() {
+        for policy_id in frame.policy_ids.iter() {
+            let policy_name = &simulation_data.config.initial_strategies[*policy_id as usize];
             *strategy_counts.entry(policy_name.clone()).or_insert(0) += 1;
         }
 
@@ -268,19 +271,19 @@ fn plot_strategy_distribution(
 fn visualize_grid_state(
     frame: &Frame,
     iteration_num: usize,
-    initial_strategies: &[String],
+    strategies: &[String],
     grid_states_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let grid_size = frame.policy_names.nrows();
+    let grid_size = frame.policy_ids.nrows();
     let cell_size = 20u32;
     let legend_width = 250u32;
     let padding = 10u32;
 
     const FONT_PATH: &str = "/usr/share/fonts/TTF/Arial.TTF";
     let font_data = fs::read(FONT_PATH).ok();
-    let font = font_data.as_ref().and_then(|data| Font::try_from_vec(data.clone()));
+    let font = font_data.and_then(|data| FontVec::try_from_vec(data).ok().map(FontArc::from));
 
-    let font_scale = Scale::uniform(20.0);
+    let font_scale = 20.0;
     let text_color = Rgb([0u8, 0u8, 0u8]);
 
     let mut policy_colors: HashMap<String, Rgb<u8>> = HashMap::new();
@@ -296,7 +299,7 @@ fn visualize_grid_state(
         Rgb([0, 128, 0]),
     ];
 
-    for (i, name) in initial_strategies.iter().enumerate() {
+    for (i, name) in strategies.iter().enumerate() {
         policy_colors.insert(name.clone(), base_colors[i % base_colors.len()]);
     }
 
@@ -309,7 +312,8 @@ fn visualize_grid_state(
         *pixel = Rgb([255, 255, 255]);
     }
 
-    for ((r, c), policy_name) in frame.policy_names.indexed_iter() {
+    for ((r, c), policy_id) in frame.policy_ids.indexed_iter() {
+        let policy_name = &strategies[*policy_id as usize];
         let color = policy_colors
             .get(policy_name)
             .unwrap_or(&Rgb([0, 0, 0]));
@@ -330,7 +334,7 @@ fn visualize_grid_state(
     let legend_spacing = 5u32;
     let text_x_offset = legend_box_size + 5;
 
-    for policy_name in initial_strategies {
+    for policy_name in strategies {
         if let Some(color) = policy_colors.get(policy_name) {
             let rect_x = legend_x_start as i32;
             let rect_y = current_y as i32;
@@ -347,7 +351,7 @@ fn visualize_grid_state(
                     rect_x + text_x_offset as i32,
                     rect_y,
                     font_scale,
-                    f,
+                    &f,
                     policy_name,
                 );
             }
