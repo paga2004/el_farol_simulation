@@ -13,6 +13,7 @@ pub struct SimulationConfig {
     pub grid_size: usize,
     pub neighbor_distance: usize,
     pub temperature: f64,
+    pub policy_retention_rate: f64,
     pub num_iterations: usize,
     pub rounds_per_update: usize,
     pub initial_strategies: Vec<Box<dyn Policy>>,
@@ -164,6 +165,7 @@ impl Simulation {
         let grid = self.game.get_grid();
         let mut new_grid = grid.clone();
         let temperature = self.config.temperature;
+        let policy_retention_rate = self.config.policy_retention_rate;
 
         for i in 0..self.config.grid_size {
             for j in 0..self.config.grid_size {
@@ -188,7 +190,7 @@ impl Simulation {
                 }
 
                 // Adapt strategy - agent.performance() will use accumulated history
-                new_grid[[i, j]].adapt_strategy(&neighbors, temperature);
+                new_grid[[i, j]].adapt_strategy(&neighbors, temperature, policy_retention_rate);
             }
         }
 
@@ -221,6 +223,7 @@ mod tests {
             grid_size: 2,
             neighbor_distance: 1,
             temperature: 1.0,
+            policy_retention_rate: 0.5,
             num_iterations: 10,
             rounds_per_update: 1,
             initial_strategies: vec![Box::new(AlwaysGo), Box::new(NeverGo)],

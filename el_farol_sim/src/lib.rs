@@ -13,6 +13,7 @@ pub struct SerializableSimulationConfig {
     pub grid_size: usize,
     pub neighbor_distance: usize,
     pub temperature: f64,
+    pub policy_retention_rate: f64,
     pub num_iterations: usize,
     pub rounds_per_update: usize,
     pub initial_strategies: Vec<String>,

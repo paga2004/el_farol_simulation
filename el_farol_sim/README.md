@@ -1,72 +1,42 @@
-# El Farol Bar Simulation
+# retention_rate_0.1
 
-This project implements a grid-based simulation of the El Farol Bar problem, where agents learn from their neighbors' strategies using softmax adaptation.
-
-## Features
-
-- Grid-based agent system
-- Multiple decision-making policies
-- Local strategy adaptation using softmax
-- Real-time visualization of results
-- Performance statistics tracking
-
-## Installation
-
-1. Make sure you have Rust installed. If not, install it from [rustup.rs](https://rustup.rs/).
-
-2. Clone this repository:
-```bash
-git clone https://github.com/yourusername/el_farol_sim.git
-cd el_farol_sim
-```
-
-3. Build the project:
-```bash
-cargo build --release
-```
-
-## Usage
-
-Run the simulation:
-```bash
-cargo run --release
-```
-
-The program will:
-1. Create a grid of agents with random initial strategies
-2. Run the simulation for the specified number of iterations
-3. Generate visualization plots in the `output` directory
+A simulation with a retention rate of 0.1
 
 ## Configuration
 
-You can modify the simulation parameters in `src/main.rs`:
+```
+name = "retention_rate_0.1"
+description = "A simulation with a retention rate of 0.1"
+grid_size = 100
+neighbor_distance = 1
+temperature = 1.0
+policy_retention_rate = 0.1
+num_iterations = 1000
+rounds_per_update = 10
+initial_strategies = [
+    "Always Go",
+    "Never Go",
+    "Predict from yesterday",
+    "Predict from day before yesterday",
+    "Random",
+    "Moving Average (3)",
+    "Moving Average (5)",
+    "Moving Average (10)",
+]
+start_random = true
 
-- `grid_size`: Size of the grid (n × n agents)
-- `neighbor_distance`: Manhattan distance for neighbor evaluation
-- `capacity`: Bar capacity
-- `temperature`: Softmax temperature for strategy adaptation
-- `num_iterations`: Number of games to simulate
-- `initial_strategies`: Set of available strategies
+```
 
-## Output
+## Statistics
 
-The simulation generates two plots in the `output` directory:
+![attendance.png](readme_pictures/attendance.png)
+![strategy_distribution.png](readme_pictures/strategy_distribution.png)
 
-1. `attendance.png`: Shows the attendance ratio over time
-2. `strategy_distribution.png`: Shows the distribution of strategies over time
+## States
 
-## Available Strategies
+![state_0000.png](readme_pictures/state_0000.png)
+![state_0249.png](readme_pictures/state_0249.png)
+![state_0499.png](readme_pictures/state_0499.png)
+![state_0749.png](readme_pictures/state_0749.png)
+![state_0999.png](readme_pictures/state_0999.png)
 
-- Always Go
-- Never Go
-- Go If Less Than 60%
-- Random
-- Moving Average
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 

@@ -42,19 +42,30 @@ impl Agent {
         self.current_policy.as_ref()
     }
 
-    pub fn adapt_strategy(&mut self, neighbors: &[(&Agent, f64)], temperature: f64) {
+    pub fn adapt_strategy(&mut self, neighbors: &[(&Agent, f64)], temperature: f64, policy_retention_rate: f64) {
         if neighbors.is_empty() {
             return;
         }
 
-        let max_perf = neighbors.iter()
-            .map(|(_, perf)| *perf)
-            .fold(f64::NEG_INFINITY, f64::max);
+        let retention_bias = policy_retention_rate * 100.0;
+
+        let biased_performances: Vec<f64> = neighbors.iter()
+            .map(|(agent, perf)| {
+                if agent.current_policy().name() == self.current_policy.name() {
+                    perf + retention_bias
+                } else {
+                    *perf
+                }
+            })
+            .collect();
+
+        let max_perf = biased_performances.iter()
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
 
         let probabilities: Vec<f64> = if temperature < 1e-6 { // Handle near-zero temperature as greedy selection
             let mut probs = vec![0.0; neighbors.len()];
-            let best_indices: Vec<usize> = neighbors.iter().enumerate()
-                .filter(|(_, (_, perf))| (*perf - max_perf).abs() < 1e-6) // Find all ties for best performance
+            let best_indices: Vec<usize> = biased_performances.iter().enumerate()
+                .filter(|(_, perf)| (**perf - max_perf).abs() < 1e-6) // Find all ties for best performance
                 .map(|(i, _)| i)
                 .collect();
             
@@ -66,8 +77,8 @@ impl Agent {
             }
             probs
         } else {
-            let exp_values: Vec<f64> = neighbors.iter()
-                .map(|(_, perf)| ((perf - max_perf) / temperature).exp())
+            let exp_values: Vec<f64> = biased_performances.iter()
+                .map(|perf| ((*perf - max_perf) / temperature).exp())
                 .collect();
 
             let exp_sum: f64 = exp_values.iter().sum();

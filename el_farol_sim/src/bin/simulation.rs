@@ -8,8 +8,7 @@ use el_farol_lib::simulation_logic::{
 };
 use el_farol_lib::{SerializableSimulationConfig, SimulationData};
 use indicatif::{ProgressBar, ProgressStyle};
-use liblzma::write::XzEncoder;
-use std::collections::HashMap;
+use liblzma::write::XzEncoder
 use std::error::Error;
 use std::fs;
 use std::fs::File;
@@ -36,11 +35,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "test_simulation".to_string(),
-        description: "test test test".to_string(),
+        name: "retention_rate_0.1".to_string(),
+        description: "A simulation with a retention rate of 0.1".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
         temperature: 1.0,
+        policy_retention_rate: 0.1,
         num_iterations: 1000,
         rounds_per_update: 10,
         initial_strategies,
@@ -75,6 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         grid_size: config.grid_size,
         neighbor_distance: config.neighbor_distance,
         temperature: config.temperature,
+        policy_retention_rate: config.policy_retention_rate,
         num_iterations: config.num_iterations,
         rounds_per_update: config.rounds_per_update,
         initial_strategies: strategy_names.clone(),
