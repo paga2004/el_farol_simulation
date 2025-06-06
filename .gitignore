@@ -2,3 +2,4 @@
 *.png
 /visualisation
 **/.env
+../simulations/test_simulation.bin.xz
