@@ -15,10 +15,11 @@ use std::fs;
 pub struct SimulationConfig {
     pub grid_size: usize,
     pub neighbor_distance: usize,
-    pub capacity: usize,
     pub temperature: f64,
     pub num_iterations: usize,
+    pub rounds_per_update: usize,
     pub initial_strategies: Vec<Box<dyn Policy>>,
+    pub start_random: bool,
 }
 
 pub struct Simulation {
@@ -29,20 +30,83 @@ pub struct Simulation {
 
 impl Simulation {
     pub fn new(config: SimulationConfig) -> Self {
-        // Create grid with random initial strategies
         let mut rng = rand::thread_rng();
-        let mut grid = Array2::from_elem((config.grid_size, config.grid_size), 
-            Agent::new((0, 0), config.initial_strategies[0].clone()));
-        
-        for i in 0..config.grid_size {
-            for j in 0..config.grid_size {
-                let strategy_idx = rng.gen_range(0..config.initial_strategies.len());
-                let strategy = config.initial_strategies[strategy_idx].clone();
-                grid[[i, j]] = Agent::new((i, j), strategy);
+        let mut grid: Array2<Agent>;
+
+        if config.start_random {
+            // Initialize with a temporary agent for Array2::from_elem, then fill randomly
+            grid = Array2::from_elem((config.grid_size, config.grid_size), 
+                Agent::new(config.initial_strategies[0].clone())); // Placeholder
+            
+            if config.initial_strategies.is_empty() {
+                panic!("Initial strategies cannot be empty for random setup.");
+            }
+
+            for i in 0..config.grid_size {
+                for j in 0..config.grid_size {
+                    let strategy_idx = rng.gen_range(0..config.initial_strategies.len());
+                    let strategy = config.initial_strategies[strategy_idx].clone();
+                    grid[[i, j]] = Agent::new(strategy);
+                }
+            }
+        } else {
+            // Specific "Never Go with corners" setup
+            let base_policy_name = "Never Go";
+            let base_policy = config.initial_strategies.iter()
+                .find(|p| p.name() == base_policy_name)
+                .map(|p| p.clone_box())
+                .unwrap_or_else(|| {
+                    eprintln!(
+                        "Warning: Policy 'Never Go' not found in initial_strategies. Using the first available strategy as base."
+                    );
+                    if config.initial_strategies.is_empty() {
+                        panic!("Initial strategies cannot be empty for non-random setup if 'Never Go' is missing.");
+                    }
+                    config.initial_strategies[0].clone_box()
+                });
+
+            let other_policies: Vec<Box<dyn Policy>> = config.initial_strategies.iter()
+                .filter(|p| p.name() != base_policy.name()) // Filter out the base policy by name
+                .map(|p| p.clone_box())
+                .collect();
+
+            // Initialize all cells with the base policy
+            grid = Array2::from_elem((config.grid_size, config.grid_size), 
+                Agent::new(base_policy.clone_box())); // Placeholder coords, actual in loop
+
+            for r in 0..config.grid_size {
+                for c in 0..config.grid_size {
+                    grid[[r,c]] = Agent::new(base_policy.clone_box());
+                }
+            }
+
+            if !other_policies.is_empty() {
+                let gs = config.grid_size;
+                if gs > 0 {
+                    // Top-left
+                    grid[[0, 0]] = Agent::new(other_policies[0 % other_policies.len()].clone_box());
+                    
+                    // Top-right
+                    if gs > 1 {
+                        grid[[0, gs - 1]] = Agent::new(other_policies[1 % other_policies.len()].clone_box());
+                    }
+                    
+                    // Bottom-left
+                    if gs > 1 { // Also implies gs > 0 already checked
+                        grid[[gs - 1, 0]] = Agent::new(other_policies[2 % other_policies.len()].clone_box());
+                    }
+
+                    // Bottom-right
+                    if gs > 1 { // Also implies gs > 0 already checked
+                        grid[[gs - 1, gs - 1]] = Agent::new(other_policies[3 % other_policies.len()].clone_box());
+                    }
+                }
+            } else {
+                eprintln!("Warning: No 'other' policies available for corners. All agents will start with the base policy.");
             }
         }
 
-        let game = Game::new(grid, config.capacity);
+        let game = Game::new(grid);
 
         // Print policy color mapping for the legend
         println!("--- Policy Color Legend ---");
@@ -74,20 +138,29 @@ impl Simulation {
         sim
     }
 
-    pub fn run_iteration(&mut self, iteration_num: usize) {
-        // Run the game
-        let result = self.game.run();
+    pub fn run_iteration(&mut self, adaptation_step_num: usize) {
+        for _round in 0..self.config.rounds_per_update {
+            // Run a single game round
+            let result = self.game.run();
+            
+            // Update statistics for this game round
+            // Note: update_statistics collects data per game round. If you later want statistics
+            // per adaptation step (e.g., average performance of agents in that step), 
+            // that would require additional logic.
+            self.update_statistics(&result);
+        }
         
-        // Update statistics
-        self.update_statistics(&result);
-        
-        // Adapt strategies
+        // Adapt strategies based on the performance over the last rounds_per_update
         self.adapt_strategies();
 
-        // Visualize grid state (iteration_num is 0-indexed for the completed round)
-        // So, after round 0, we save state 1; after round 1, state 2, etc.
-        if let Err(e) = self.visualize_grid_state(iteration_num + 1) {
-            eprintln!("Error visualizing grid state for iteration {}: {}", iteration_num + 1, e);
+        // Visualize grid state after adaptation
+        // adaptation_step_num is 0-indexed for the completed adaptation step.
+        // So, after adaptation_step 0, we save state 1, etc.
+        if let Err(e) = self.visualize_grid_state(adaptation_step_num + 1) {
+            eprintln!(
+                "Error visualizing grid state for adaptation_step_num {}: {}", 
+                adaptation_step_num + 1, e
+            );
         }
     }
 
@@ -142,13 +215,20 @@ impl Simulation {
                     }
                 }
 
-                // Adapt strategy
+                // Adapt strategy - agent.performance() will use accumulated history
                 new_grid[[i, j]].adapt_strategy(&neighbors, temperature);
             }
         }
 
-        // Update grid
-        self.game = Game::new(new_grid, self.config.capacity);
+        // Clear performance history for all agents for the next batch of rounds
+        for i in 0..self.config.grid_size {
+            for j in 0..self.config.grid_size {
+                new_grid[[i, j]].clear_performance_history();
+            }
+        }
+
+        // Update grid with new strategies and cleared histories
+        self.game = Game::new(new_grid);
     }
 
     fn visualize_grid_state(&self, iteration_num: usize) -> Result<(), Box<dyn std::error::Error>> {
@@ -246,7 +326,7 @@ impl Simulation {
                     draw_text_mut(
                         &mut img,
                         text_color,
-                        (rect_x + text_x_offset as i32),
+                        rect_x + text_x_offset as i32,
                         rect_y, // Align text with top of the color box
                         font_scale,
                         f,
@@ -284,10 +364,11 @@ mod tests {
         let config = SimulationConfig {
             grid_size: 2,
             neighbor_distance: 1,
-            capacity: 2,
             temperature: 1.0,
             num_iterations: 10,
+            rounds_per_update: 1,
             initial_strategies: vec![Box::new(AlwaysGo), Box::new(NeverGo)],
+            start_random: true,
         };
         let simulation = Simulation::new(config);
         assert_eq!(simulation.get_statistics().len(), 0);

@@ -42,7 +42,7 @@ pub struct AlwaysGo;
 
 impl Policy for AlwaysGo {
     fn decide(&self, _history: &[GameResult]) -> f64 {
-        0.59
+        0.0
     }
 
     fn name(&self) -> &'static str {
@@ -56,7 +56,7 @@ pub struct NeverGo;
 
 impl Policy for NeverGo {
     fn decide(&self, _history: &[GameResult]) -> f64 {
-        0.61
+        1.0
     }
 
     fn name(&self) -> &'static str {
