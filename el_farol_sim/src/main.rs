@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Box::new(NeverGo),
             Box::new(GoIfLessThanSixty),
             Box::new(RandomPolicy),
-            Box::new(MovingAveragePolicy::new(3))
+            Box::new(MovingAveragePolicy::<3>)
         ],
         start_random: false,
     };
