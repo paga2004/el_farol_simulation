@@ -1,3 +1,5 @@
+use chrono::prelude::*;
+use clap::Parser;
 use el_farol_lib::{Frame, SimulationData};
 use image::{Rgb, RgbImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_text_mut};
@@ -9,23 +11,103 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to the simulation data file
+    input_file: PathBuf,
+    /// Optional name for the experiment folder
+    #[arg(short, long)]
+    name: Option<String>,
+    /// Flag to disable video creation
+    #[arg(long)]
+    no_video: bool,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut file = File::open("simulation_data.bin")?;
+    let args = Args::parse();
+    let mut file = File::open(&args.input_file)?;
     let mut encoded = Vec::new();
     file.read_to_end(&mut encoded)?;
     let simulation_data: SimulationData = bincode::deserialize(&encoded)?;
 
-    fs::create_dir_all("output/grid_states")?;
+    let output_dir = "output";
+    let grid_states_dir = format!("{}/grid_states", output_dir);
+    fs::create_dir_all(&grid_states_dir)?;
 
-    visualize_simulation(&simulation_data)?;
+    visualize_simulation(&simulation_data, &grid_states_dir)?;
+
+    let video_path = format!("{}/simulation.mp4", output_dir);
+    if !args.no_video {
+        create_video(&grid_states_dir, &video_path)?;
+    }
+
+    println!("Please enter a description for this experiment:");
+    let mut description = String::new();
+    io::stdin().read_line(&mut description)?;
+
+    let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+    let folder_name = args.name.unwrap_or_else(|| "experiment".to_string());
+    let experiment_dir = format!("{}/{}_{}", output_dir, folder_name, timestamp);
+    fs::create_dir_all(&experiment_dir)?;
+
+    fs::write(format!("{}/description.txt", experiment_dir), description)?;
+
+    let attendance_plot_path = format!("{}/attendance.png", output_dir);
+    let strategy_plot_path = format!("{}/strategy_distribution.png", output_dir);
+
+    fs::rename(
+        attendance_plot_path,
+        format!("{}/attendance.png", &experiment_dir),
+    )?;
+    fs::rename(
+        strategy_plot_path,
+        format!("{}/strategy_distribution.png", &experiment_dir),
+    )?;
+    if !args.no_video {
+        fs::rename(&video_path, format!("{}/simulation.mp4", &experiment_dir))?;
+    }
+    fs::rename(grid_states_dir, format!("{}/grid_states", &experiment_dir))?;
+
+    println!("Experiment data saved to: {}", experiment_dir);
 
     Ok(())
 }
 
-fn visualize_simulation(simulation_data: &SimulationData) -> Result<(), Box<dyn Error>> {
+fn create_video(frames_dir: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
+    let framerate = 10;
+    let output = Command::new("ffmpeg")
+        .arg("-y") // Overwrite output file if it exists
+        .arg("-framerate")
+        .arg(framerate.to_string())
+        .arg("-i")
+        .arg(format!("{}/state_%04d.png", frames_dir))
+        .arg("-c:v")
+        .arg("libx264")
+        .arg("-pix_fmt")
+        .arg("yuv420p")
+        .arg(output_path)
+        .output()?;
+
+    if !output.status.success() {
+        eprintln!(
+            "ffmpeg error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    Ok(())
+}
+
+fn visualize_simulation(
+    simulation_data: &SimulationData,
+    grid_states_dir: &str,
+) -> Result<(), Box<dyn Error>> {
+    plot_statistics(simulation_data, "output")?;
     let pb = ProgressBar::new(simulation_data.frames.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
@@ -34,15 +116,22 @@ fn visualize_simulation(simulation_data: &SimulationData) -> Result<(), Box<dyn 
     );
 
     for (i, frame) in simulation_data.frames.iter().enumerate() {
-        visualize_grid_state(frame, i, &simulation_data.initial_strategies)?;
+        visualize_grid_state(
+            frame,
+            i,
+            &simulation_data.initial_strategies,
+            grid_states_dir,
+        )?;
         pb.inc(1);
     }
     pb.finish_with_message("visualization complete");
-    plot_statistics(simulation_data)?;
     Ok(())
 }
 
-fn plot_statistics(simulation_data: &SimulationData) -> Result<(), Box<dyn Error>> {
+fn plot_statistics(
+    simulation_data: &SimulationData,
+    output_dir: &str,
+) -> Result<(), Box<dyn Error>> {
     let mut statistics: HashMap<String, Vec<f64>> = HashMap::new();
     let total_agents = (simulation_data.frames[0].policy_names.nrows()
         * simulation_data.frames[0].policy_names.ncols()) as f64;
@@ -66,17 +155,20 @@ fn plot_statistics(simulation_data: &SimulationData) -> Result<(), Box<dyn Error
                 .push(ratio);
         }
     }
-    plot_attendance(&statistics)?;
-    plot_strategy_distribution(&statistics)?;
+    plot_attendance(&statistics, output_dir)?;
+    plot_strategy_distribution(&statistics, output_dir)?;
     Ok(())
 }
 
-fn plot_attendance(statistics: &HashMap<String, Vec<f64>>) -> Result<(), Box<dyn std::error::Error>> {
+fn plot_attendance(
+    statistics: &HashMap<String, Vec<f64>>,
+    output_dir: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let attendance = statistics
         .get("attendance_ratio")
         .ok_or("No attendance data found")?;
 
-    let path = Path::new("output").join("attendance.png");
+    let path = Path::new(output_dir).join("attendance.png");
     let root = BitMapBackend::new(&path, (800, 600)).into_drawing_area();
     root.fill(&WHITE)?;
 
@@ -106,8 +198,9 @@ fn plot_attendance(statistics: &HashMap<String, Vec<f64>>) -> Result<(), Box<dyn
 
 fn plot_strategy_distribution(
     statistics: &HashMap<String, Vec<f64>>,
+    output_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = Path::new("output").join("strategy_distribution.png");
+    let path = Path::new(output_dir).join("strategy_distribution.png");
     let root = BitMapBackend::new(&path, (800, 600)).into_drawing_area();
     root.fill(&WHITE)?;
 
@@ -176,6 +269,7 @@ fn visualize_grid_state(
     frame: &Frame,
     iteration_num: usize,
     initial_strategies: &[String],
+    grid_states_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let grid_size = frame.policy_names.nrows();
     let cell_size = 20u32;
@@ -266,7 +360,7 @@ fn visualize_grid_state(
         }
     }
 
-    let output_path_str = format!("output/grid_states/state_{:04}.png", iteration_num);
+    let output_path_str = format!("{}/state_{:04}.png", grid_states_dir, iteration_num);
     let output_path = Path::new(&output_path_str);
     img.save(output_path)?;
 
