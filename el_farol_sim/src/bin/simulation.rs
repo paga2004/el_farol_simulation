@@ -23,21 +23,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
     let initial_strategies: Vec<Box<dyn el_farol_lib::simulation_logic::policy::Policy>> = vec![
-        // Box::new(AlwaysGo),
-        // Box::new(NeverGo),
+        Box::new(AlwaysGo),
+        Box::new(NeverGo),
         Box::new(PredictFromYesterday),
         Box::new(PredictFromDayBeforeYesterday),
-        // Box::new(RandomPolicy),
-        // Box::new(MovingAveragePolicy::<3>),
-        // Box::new(MovingAveragePolicy::<5>),
-        // Box::new(MovingAveragePolicy::<10>),
+        Box::new(RandomPolicy),
+        Box::new(MovingAveragePolicy::<3>),
+        Box::new(MovingAveragePolicy::<5>),
+        Box::new(MovingAveragePolicy::<10>),
     ];
     let strategy_names: Vec<String> = initial_strategies.iter().map(|p| p.name()).collect();
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "yesterday_vs_day_before".to_string(),
-        description: "A simulation where agents predict attendance based on yesterday's or the day before yesterday's results.".to_string(),
+        name: "test_simulation".to_string(),
+        description: "test test test".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
         temperature: 1.0,

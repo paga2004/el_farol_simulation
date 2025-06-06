@@ -1,6 +1,5 @@
 *.mp4
-*.png
 /visualisation
 **/.env
-simulations/test_simulation.bin.xz
+simulations/test_simulation*.bin.xz
 /readme_tmp
