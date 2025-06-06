@@ -1,41 +1,30 @@
-# all-policies-200
+# .
 
-A simulation till 200 iterations with all available policies, ret rate 0.02
+A simulation with all available non random policies.
 
 ## Configuration
 
 ```
-name = "all-policies-200"
-description = "A simulation till 200 iterations with all available policies, ret rate 0.02"
+name = "oneround-all-non-random"
+description = "A simulation with all available non random policies."
 grid_size = 100
 neighbor_distance = 1
 temperature = 1.0
 policy_retention_rate = 0.02
 num_iterations = 200
-rounds_per_update = 3
+rounds_per_update = 1
 initial_strategies = [
     "Always Go",
     "Never Go",
     "Predict from yesterday",
     "Predict from day before yesterday",
     "Random",
-    "Moving Average (3)",
-    "Moving Average (5)",
-    "Moving Average (10)",
     "Full History Average",
     "Even History Average",
     "Complex Formula",
     "Drunkard",
     "Stupid Nerd",
-    "Uniform [0..1)",
     "Weighted History",
-    "Sliding Weighted Average (5)",
-    "Exponential Moving Average (a=0.1)",
-    "Exponential Moving Average (a=0.5)",
-    "Exponential Moving Average (a=0.9)",
-    "Generalized Mean (m=5, r=1)",
-    "Generalized Mean (m=5, r=2)",
-    "Generalized Mean (m=5, r=-1)",
 ]
 start_random = true
 

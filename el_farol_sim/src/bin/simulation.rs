@@ -1,14 +1,17 @@
 use dotenvy;
 use el_farol_lib::simulation_logic::{
     policy::{
-        AlwaysGo, MovingAveragePolicy, NeverGo, PredictFromDayBeforeYesterday,
-        PredictFromYesterday, RandomPolicy,
+        AlwaysGo, ComplexFormulaPolicy, DrunkardPolicy, EvenHistoryAveragePolicy,
+        ExponentialMovingAveragePolicy, FullHistoryAveragePolicy, GeneralizedMeanPolicy,
+        MovingAveragePolicy, NeverGo, PredictFromDayBeforeYesterday, PredictFromYesterday,
+        RandomPolicy, SlidingWeightedAveragePolicy, StupidNerdPolicy, UniformPolicy,
+        WeightedHistoryPolicy,
     },
     simulation::{Simulation, SimulationConfig},
 };
 use el_farol_lib::{SerializableSimulationConfig, SimulationData};
 use indicatif::{ProgressBar, ProgressStyle};
-use liblzma::write::XzEncoder
+use liblzma::write::XzEncoder;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
@@ -27,22 +30,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         Box::new(PredictFromYesterday),
         Box::new(PredictFromDayBeforeYesterday),
         Box::new(RandomPolicy),
-        Box::new(MovingAveragePolicy::<3>),
-        Box::new(MovingAveragePolicy::<5>),
-        Box::new(MovingAveragePolicy::<10>),
+        // Box::new(MovingAveragePolicy::<3>),
+        // Box::new(MovingAveragePolicy::<5>),
+        // Box::new(MovingAveragePolicy::<10>),
+        Box::new(FullHistoryAveragePolicy),
+        Box::new(EvenHistoryAveragePolicy),
+        Box::new(ComplexFormulaPolicy),
+        Box::new(DrunkardPolicy),
+        Box::new(StupidNerdPolicy),
+        // Box::new(UniformPolicy::new(0.0, 1.0)),
+        // Box::new(UniformPolicy::new(0.25, 0.75)),
+        // Box::new(UniformPolicy::new(0.4, 0.6)),
+        Box::new(WeightedHistoryPolicy::new()),
+        // Box::new(SlidingWeightedAveragePolicy::new()),
+        // Box::new(ExponentialMovingAveragePolicy::new(0.1)),
+        // Box::new(ExponentialMovingAveragePolicy::new(0.5)),
+        // Box::new(ExponentialMovingAveragePolicy::new(0.9)),
+        // Box::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
+        // Box::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
+        // Box::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
     ];
     let strategy_names: Vec<String> = initial_strategies.iter().map(|p| p.name()).collect();
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "retention_rate_0.1".to_string(),
-        description: "A simulation with a retention rate of 0.1".to_string(),
+        name: "oneround-all-non-random".to_string(),
+        description: "A simulation with all available non random policies.".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
         temperature: 1.0,
-        policy_retention_rate: 0.1,
-        num_iterations: 1000,
-        rounds_per_update: 10,
+        policy_retention_rate: 0.02,
+        num_iterations: 200,
+        rounds_per_update: 1,
         initial_strategies,
         start_random: true,
     };
