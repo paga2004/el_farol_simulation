@@ -2,7 +2,6 @@ pub mod simulation_logic;
 
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub type StrategyId = u8;
 

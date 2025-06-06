@@ -1,16 +1,16 @@
-# retention_rate_0.1
+# retention_rate_0.05
 
-A simulation with a retention rate of 0.1
+A simulation with a retention rate of 0.05
 
 ## Configuration
 
 ```
-name = "retention_rate_0.1"
-description = "A simulation with a retention rate of 0.1"
+name = "retention_rate_0.05"
+description = "A simulation with a retention rate of 0.05"
 grid_size = 100
 neighbor_distance = 1
 temperature = 1.0
-policy_retention_rate = 0.1
+policy_retention_rate = 0.05
 num_iterations = 1000
 rounds_per_update = 10
 initial_strategies = [
