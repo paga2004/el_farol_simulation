@@ -141,9 +141,9 @@ impl Simulation {
         for _round in 0..self.config.rounds_per_update {
             self.game.run();
         }
-
         self.adapt_strategies();
 
+        
         let grid = self.game.get_grid();
         let policy_ids = grid.mapv(|agent| {
             let name = agent.current_policy().name();
@@ -151,6 +151,7 @@ impl Simulation {
         });
         let predictions = grid.mapv(|agent| agent.last_prediction.unwrap_or(0.0));
         let attendance_ratio = *self.game.history.last().unwrap_or(&0.0);
+
 
         Frame {
             policy_ids,
@@ -167,14 +168,21 @@ impl Simulation {
         for i in 0..self.config.grid_size {
             for j in 0..self.config.grid_size {
                 let mut neighbors = Vec::new();
-                
+
                 // Find neighbors within Manhattan distance
                 let neighbor_distance = self.config.neighbor_distance as isize;
-                for ni in (i as isize - neighbor_distance).max(0)..=(i as isize + neighbor_distance).min(self.config.grid_size as isize - 1) {
-                    for nj in (j as isize - neighbor_distance).max(0)..=(j as isize + neighbor_distance).min(self.config.grid_size as isize - 1) {
+                for ni in (i as isize - neighbor_distance).max(0)
+                    ..=(i as isize + neighbor_distance).min(self.config.grid_size as isize - 1)
+                {
+                    for nj in (j as isize - neighbor_distance).max(0)
+                        ..=(j as isize + neighbor_distance).min(self.config.grid_size as isize - 1)
+                    {
                         let distance = (i as isize - ni).abs() + (j as isize - nj).abs();
                         if distance <= neighbor_distance {
-                            neighbors.push((&grid[[ni as usize, nj as usize]], grid[[ni as usize, nj as usize]].performance()));
+                            neighbors.push((
+                                &grid[[ni as usize, nj as usize]],
+                                grid[[ni as usize, nj as usize]].performance(),
+                            ));
                         }
                     }
                 }
@@ -191,8 +199,8 @@ impl Simulation {
             }
         }
 
-        // Update grid with new strategies and cleared histories
-        self.game = Game::new(new_grid);
+        // Update grid with new strategies, preserving the game's attendance history
+        self.game.set_grid(new_grid);
     }
 
     pub fn get_statistics(&self) -> &HashMap<String, Vec<f64>> {

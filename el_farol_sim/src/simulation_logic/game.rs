@@ -49,6 +49,10 @@ impl Game {
     pub fn get_grid(&self) -> &Array2<Agent> {
         &self.grid
     }
+
+    pub fn set_grid(&mut self, new_grid: Array2<Agent>) {
+        self.grid = new_grid;
+    }
 }
 
 #[cfg(test)]
