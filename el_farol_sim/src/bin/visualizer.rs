@@ -108,7 +108,14 @@ fn visualize_simulation(
     grid_states_dir: &str,
     plots_dir: &str,
 ) -> Result<(), Box<dyn Error>> {
-    plot_statistics(simulation_data, plots_dir)?;
+    let num_strategies = simulation_data.config.initial_strategies.len();
+    let colors = generate_distinct_colors(num_strategies);
+    let mut strategy_colors: HashMap<String, Rgb<u8>> = HashMap::new();
+    for (i, name) in simulation_data.config.initial_strategies.iter().enumerate() {
+        strategy_colors.insert(name.clone(), colors[i % colors.len()]);
+    }
+
+    plot_statistics(simulation_data, plots_dir, &strategy_colors)?;
     let pb = ProgressBar::new(simulation_data.frames.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
@@ -121,6 +128,7 @@ fn visualize_simulation(
             frame,
             i,
             &simulation_data.config.initial_strategies,
+            &strategy_colors,
             grid_states_dir,
         )?;
         pb.inc(1);
@@ -132,6 +140,7 @@ fn visualize_simulation(
 fn plot_statistics(
     simulation_data: &SimulationData,
     output_dir: &str,
+    strategy_colors: &HashMap<String, Rgb<u8>>,
 ) -> Result<(), Box<dyn Error>> {
     let mut statistics: HashMap<String, Vec<f64>> = HashMap::new();
     let total_agents = (simulation_data.frames[0].policy_ids.nrows()
@@ -158,7 +167,7 @@ fn plot_statistics(
         }
     }
     plot_attendance(&statistics, output_dir)?;
-    plot_strategy_distribution(&statistics, output_dir)?;
+    plot_strategy_distribution(&statistics, output_dir, strategy_colors)?;
     Ok(())
 }
 
@@ -201,6 +210,7 @@ fn plot_attendance(
 fn plot_strategy_distribution(
     statistics: &HashMap<String, Vec<f64>>,
     output_dir: &str,
+    strategy_colors: &HashMap<String, Rgb<u8>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(output_dir).join("strategy_distribution.png");
     let root = BitMapBackend::new(&path, (800, 600)).into_drawing_area();
@@ -232,30 +242,34 @@ fn plot_strategy_distribution(
         .y_desc("Strategy Ratio")
         .draw()?;
 
-    let colors = vec![&RED, &BLUE, &GREEN, &YELLOW, &MAGENTA, &CYAN];
-    let mut color_idx = 0;
+    let mut strategy_keys: Vec<_> = statistics
+        .keys()
+        .filter(|k| k.starts_with("strategy_"))
+        .collect();
+    strategy_keys.sort();
 
-    for (key, values) in statistics.iter() {
-        if key.starts_with("strategy_") {
-            if values.is_empty() {
-                continue;
-            }
-            let strategy_name = key.trim_start_matches("strategy_");
-            let color = colors[color_idx % colors.len()];
-
-            chart
-                .draw_series(LineSeries::new(
-                    values
-                        .iter()
-                        .enumerate()
-                        .map(|(x, &y)| (x as f32, y as f32)),
-                    color.stroke_width(2),
-                ))?
-                .label(strategy_name)
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
-
-            color_idx += 1;
+    for key in &strategy_keys {
+        let values = statistics.get(*key).unwrap();
+        if values.is_empty() {
+            continue;
         }
+        let strategy_name = (*key).trim_start_matches("strategy_");
+        let color_rgb = strategy_colors
+            .get(strategy_name)
+            .cloned()
+            .unwrap_or(Rgb([0, 0, 0]));
+        let color = RGBColor(color_rgb.0[0], color_rgb.0[1], color_rgb.0[2]);
+
+        chart
+            .draw_series(LineSeries::new(
+                values
+                    .iter()
+                    .enumerate()
+                    .map(|(x, &y)| (x as f32, y as f32)),
+                color.stroke_width(2),
+            ))?
+            .label(strategy_name)
+            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
     }
 
     chart
@@ -271,6 +285,7 @@ fn visualize_grid_state(
     frame: &Frame,
     iteration_num: usize,
     strategies: &[String],
+    policy_colors: &HashMap<String, Rgb<u8>>,
     grid_states_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let grid_size = frame.policy_ids.nrows();
@@ -284,23 +299,6 @@ fn visualize_grid_state(
 
     let font_scale = 20.0;
     let text_color = Rgb([0u8, 0u8, 0u8]);
-
-    let mut policy_colors: HashMap<String, Rgb<u8>> = HashMap::new();
-    let base_colors = [
-        Rgb([255, 0, 0]),
-        Rgb([0, 0, 255]),
-        Rgb([0, 255, 0]),
-        Rgb([255, 255, 0]),
-        Rgb([255, 0, 255]),
-        Rgb([0, 255, 255]),
-        Rgb([128, 0, 0]),
-        Rgb([0, 0, 128]),
-        Rgb([0, 128, 0]),
-    ];
-
-    for (i, name) in strategies.iter().enumerate() {
-        policy_colors.insert(name.clone(), base_colors[i % base_colors.len()]);
-    }
 
     let img_width = grid_size as u32 * cell_size + legend_width + 3 * padding;
     let img_height = grid_size as u32 * cell_size + 2 * padding;
@@ -368,4 +366,39 @@ fn visualize_grid_state(
     img.save(output_path)?;
 
     Ok(())
+}
+
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Rgb<u8> {
+    let c = v * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = v - c;
+
+    let (r_prime, g_prime, b_prime) = if h >= 0.0 && h < 60.0 {
+        (c, x, 0.0)
+    } else if h >= 60.0 && h < 120.0 {
+        (x, c, 0.0)
+    } else if h >= 120.0 && h < 180.0 {
+        (0.0, c, x)
+    } else if h >= 180.0 && h < 240.0 {
+        (0.0, x, c)
+    } else if h >= 240.0 && h < 300.0 {
+        (x, 0.0, c)
+    } else {
+        (c, 0.0, x)
+    };
+
+    Rgb([
+        ((r_prime + m) * 255.0) as u8,
+        ((g_prime + m) * 255.0) as u8,
+        ((b_prime + m) * 255.0) as u8,
+    ])
+}
+
+fn generate_distinct_colors(num_colors: usize) -> Vec<Rgb<u8>> {
+    (0..num_colors)
+        .map(|i| {
+            let hue = (i as f32 / num_colors as f32) * 360.0;
+            hsv_to_rgb(hue, 0.85, 0.9)
+        })
+        .collect()
 } 

@@ -225,21 +225,29 @@ impl Policy for StupidNerdPolicy {
     }
 }
 
-/// Ber(0.6) (regenerated each round)
+/// Predicts a random ratio from a uniform distribution U(low, high)
 #[derive(Debug, Clone, Copy)]
-pub struct BernoulliPolicy60;
+pub struct UniformPolicy {
+    low: f64,
+    high: f64,
+}
 
-impl Policy for BernoulliPolicy60 {
+impl UniformPolicy {
+    pub fn new(low: f64, high: f64) -> Self {
+        assert!(low <= high && (0.0..=1.0).contains(&low) && (0.0..=1.0).contains(&high));
+        Self { low, high }
+    }
+}
+
+impl Policy for UniformPolicy {
     fn decide(&self, _history: &[f64]) -> f64 {
-        if rand::random::<f64>() < 0.6 {
-            1.0
-        } else {
-            0.0
-        }
+        let mut rng = rand::thread_rng();
+        let dist = Uniform::new(self.low, self.high);
+        dist.sample(&mut rng)
     }
 
     fn name(&self) -> String {
-        "Bernoulli (0.6)".to_string()
+        format!("Uniform [{}..{})", self.low, self.high)
     }
 }
 
