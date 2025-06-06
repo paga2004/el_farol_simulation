@@ -8,11 +8,13 @@ def generate_readme(folder_path):
         print(f"Error: Folder '{folder_path}' not found.")
         return
 
-    # Create or clean the readme_tmp directory
-    tmp_dir = 'readme_tmp'
+    # Create or clean the readme_tmp directory inside the simulation folder
+    tmp_dir = os.path.join(folder_path, 'readme_tmp')
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
-    os.makedirs(os.path.join(tmp_dir, 'readme_pictures'))
+    
+    readme_pics_dir = os.path.join(tmp_dir, 'readme_pictures')
+    os.makedirs(readme_pics_dir)
 
     # Extract the name from the folder path
     name = os.path.basename(os.path.normpath(folder_path))
@@ -41,7 +43,7 @@ def generate_readme(folder_path):
     readme_content += "## Statistics\n\n"
     statistic_pictures = [f for f in os.listdir(folder_path) if f.endswith('.png')]
     for pic in statistic_pictures:
-        shutil.copy(os.path.join(folder_path, pic), os.path.join(tmp_dir, 'readme_pictures', pic))
+        shutil.copy(os.path.join(folder_path, pic), os.path.join(readme_pics_dir, pic))
         readme_content += f"![{pic}](readme_pictures/{pic})\n"
     readme_content += "\n"
 
@@ -59,7 +61,7 @@ def generate_readme(folder_path):
             state_pictures = all_states
 
         for pic in state_pictures:
-            shutil.copy(os.path.join(grid_states_path, pic), os.path.join(tmp_dir, 'readme_pictures', pic))
+            shutil.copy(os.path.join(grid_states_path, pic), os.path.join(readme_pics_dir, pic))
             readme_content += f"![{pic}](readme_pictures/{pic})\n"
     readme_content += "\n"
 
