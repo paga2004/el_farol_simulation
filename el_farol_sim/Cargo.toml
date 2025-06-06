@@ -33,6 +33,8 @@ thiserror = "1.0"
 anyhow = "1.0"
 rayon = "1.8"  # For parallel processing
 indicatif = "0.17.7"
+clap = { version = "4.4", features = ["derive"] }
+chrono = "0.4"
 
 [dev-dependencies]
 criterion = "0.5"
