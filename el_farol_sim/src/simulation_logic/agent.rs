@@ -56,67 +56,67 @@ impl Agent {
             return;
         }
 
-        let retention_bias = policy_retention_rate * 100.0;
+        let mut rng = rand::thread_rng();
+        if rng.gen::<f64>() < policy_retention_rate {
+            return;
+        }
 
-        let biased_performances: Vec<f64> = neighbors.iter()
-            .map(|(agent, perf)| {
-                if agent.current_policy().name() == self.current_policy.name() {
-                    perf + retention_bias
-                } else {
-                    *perf
-                }
-            })
-            .collect();
-
-        let max_perf = biased_performances.iter()
-            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-
-        let probabilities: Vec<f64> = if temperature < 1e-6 { // Handle near-zero temperature as greedy selection
-            let mut probs = vec![0.0; neighbors.len()];
-            let best_indices: Vec<usize> = biased_performances.iter().enumerate()
-                .filter(|(_, perf)| (**perf - max_perf).abs() < 1e-6) // Find all ties for best performance
-                .map(|(i, _)| i)
-                .collect();
-            
-            if !best_indices.is_empty() {
-                let chosen_index_within_best = rand::thread_rng().gen_range(0..best_indices.len());
-                probs[best_indices[chosen_index_within_best]] = 1.0;
-            } else {
-                eprintln!("Warning: best_indices is empty despite having neighbors. This should not happen.");
-            }
-            probs
+        let new_policy = self.choose_new_policy(neighbors, temperature, &mut rng);
+        
+        if self.current_policy.name() != new_policy.name() {
+            self.current_policy = new_policy;
+            self.performance_history.clear();
         } else {
-            let exp_values: Vec<f64> = biased_performances.iter()
-                .map(|perf| ((*perf - max_perf) / temperature).exp())
-                .collect();
-
-            let exp_sum: f64 = exp_values.iter().sum();
-
-            if exp_sum.abs() < 1e-9 {
-                // Fallback to equal probabilities if sum is too small
-                vec![1.0 / neighbors.len() as f64; neighbors.len()]
-            } else {
-                exp_values.into_iter()
-                    .map(|exp_val| exp_val / exp_sum)
-                    .collect()
+            self.current_policy = new_policy;
+        }
+    }
+    
+    fn choose_new_policy(&self, neighbors: &[(&Agent, f64)], temperature: f64, rng: &mut impl Rng) -> Arc<dyn Policy> {
+        let performances: Vec<f64> = neighbors.iter().map(|(_, perf)| *perf).collect();
+    
+        if temperature < 1e-6 {
+            self.greedy_policy_selection(neighbors, &performances, rng)
+        } else {
+            self.softmax_policy_selection(neighbors, &performances, temperature, rng)
+        }
+    }
+    
+    fn greedy_policy_selection(&self, neighbors: &[(&Agent, f64)], performances: &[f64], rng: &mut impl Rng) -> Arc<dyn Policy> {
+        let max_perf = performances.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    
+        let best_indices: Vec<usize> = performances.iter().enumerate()
+            .filter(|(_, &perf)| (perf - max_perf).abs() < 1e-6)
+            .map(|(i, _)| i)
+            .collect();
+    
+        if let Some(&chosen_index) = best_indices.choose(rng) {
+            neighbors[chosen_index].0.current_policy()
+        } else {
+            // Fallback: This should ideally not be reached if neighbors is not empty.
+            // Return the policy of a random neighbor.
+            neighbors.choose(rng).unwrap().0.current_policy()
+        }
+    }
+    
+    fn softmax_policy_selection(&self, neighbors: &[(&Agent, f64)], performances: &[f64], temperature: f64, rng: &mut impl Rng) -> Arc<dyn Policy> {
+        let max_perf = performances.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    
+        let weights: Vec<f64> = performances.iter()
+            .map(|&perf| ((perf - max_perf) / temperature).exp())
+            .collect();
+    
+        let dist = match rand::distributions::WeightedIndex::new(&weights) {
+            Ok(dist) => dist,
+            Err(_) => { // This can happen if all weights are zero (e.g., due to underflow)
+                // Fallback to uniform random selection among neighbors
+                let dist = rand::distributions::Uniform::new(0, neighbors.len());
+                let chosen_index = rng.sample(dist);
+                return neighbors[chosen_index].0.current_policy();
             }
         };
-
-        // Select new policy based on probabilities
-        let mut rng = rand::thread_rng();
-        let random_value = rng.gen::<f64>();
-        
-        let mut cumulative = 0.0;
-        for (i, prob) in probabilities.iter().enumerate() {
-            cumulative += prob;
-            if random_value <= cumulative {
-                if self.current_policy.name() != neighbors[i].0.current_policy.name() {
-                    self.performance_history.clear();
-                }
-                self.current_policy = neighbors[i].0.current_policy.clone();
-                break;
-            }
-        }
+    
+        let chosen_index = rng.sample(dist);
+        neighbors[chosen_index].0.current_policy()
     }
 
     pub fn clear_performance_history(&mut self) {
