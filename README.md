@@ -1,23 +1,26 @@
-# really_high_retention_rate
+# discrete_payoff_matrix_with_random_policy
 
-Looks like the key is to have a really high retention rate
+the random policy always wins
 
 ## Configuration
 
 ```
-name = "really_high_retention_rate"
-description = "Looks like the key is to have a really high retention rate"
+name = "discrete_payoff_matrix_with_random_policy"
+description = "the random policy always wins"
 grid_size = 100
 neighbor_distance = 1
-temperature = 0.1
-policy_retention_rate = 0.8
+temperature = 1.0
+policy_retention_rate = 0.5
 num_iterations = 1000
 rounds_per_update = 1
 initial_strategies = [
+    "Always Go",
+    "Never Go",
     "Predict from yesterday",
     "Predict from day before yesterday",
     "Random",
     "Moving Average (3)",
+    "Moving Average (5)",
     "Moving Average (10)",
     "Full History Average",
     "Even History Average",

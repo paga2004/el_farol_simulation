@@ -9,7 +9,7 @@ use std::fmt::Debug;
 #[derive(Debug)]
 pub struct Agent {
     current_policy: Arc<dyn Policy>,
-    pub performance_history: Vec<f64>, // Stores absolute prediction error
+    pub performance_history: Vec<f64>, // Stores points now, not error
     pub last_prediction: Option<f64>, // Stores the last prediction made by the policy
 }
 
@@ -22,23 +22,21 @@ impl Agent {
         }
     }
 
-    pub fn update_performance(&mut self, actual_attendance_ratio: f64) {
-        if let Some(prediction) = self.last_prediction {
-            let error = (prediction - actual_attendance_ratio).abs();
-            self.performance_history.push(error);
-        } else {
-            panic!("update_performance called without a previous prediction");
-        }
+    pub fn update_performance(&mut self, went_to_bar: bool, actual_attendance_ratio: f64) {
+        let bar_is_overcrowded = actual_attendance_ratio >= 0.6;
+        let score = match (went_to_bar, bar_is_overcrowded) {
+            (true, false) => 2.0, // Went to a non-crowded bar
+            (false, true) => 1.0, // Stayed home from a crowded bar
+            _ => 0.0,             // Other cases
+        };
+        self.performance_history.push(score);
     }
 
     pub fn performance(&self) -> f64 {
         if self.performance_history.is_empty() {
-            return 0.0; // Neutral performance if no history. Score 0-100 range.
+            return 0.0;
         }
-        // avg_error will be in the range [0.0, 1.0]
-        let avg_error: f64 = self.performance_history.iter().sum::<f64>() / self.performance_history.len() as f64;
-        // Performance score is 0-100: (1.0 - avg_error) * 100.0. Higher is better.
-        ( (1.0 - avg_error).max(0.0) ) * 100.0
+        self.performance_history.iter().sum()
     }
 
     pub fn current_policy(&self) -> Arc<dyn Policy> {
@@ -141,39 +139,34 @@ mod tests {
 
     #[test]
     fn test_agent_performance() {
-        let mut agent = Agent::new(Arc::new(AlwaysGo)); // AlwaysGo predicts 0.0 (ratio)
-        
-        // Round 1: Agent predicts 0.0. Actual attendance is 0.2 (20% ratio).
-        agent.last_prediction = Some(0.0);
-        agent.update_performance(0.2); // Error = |0.0 - 0.2| = 0.2
-        assert_eq!(agent.performance_history, vec![0.2]);
-        // Performance = (1.0 - 0.2) * 100.0 = 80.0
-        assert!((agent.performance() - 80.0).abs() < 1e-9);
+        let mut agent = Agent::new(Arc::new(AlwaysGo));
 
-        // Round 2: Agent predicts 0.0. Actual attendance is 0.7 (70% ratio).
-        agent.last_prediction = Some(0.0);
-        agent.update_performance(0.7); // Error = |0.0 - 0.7| = 0.7
-        assert_eq!(agent.performance_history, vec![0.2, 0.7]);
-        // avg_error = (0.2 + 0.7) / 2 = 0.45
-        // Performance = (1.0 - 0.45) * 100.0 = 0.55 * 100.0 = 55.0
-        assert!((agent.performance() - 55.0).abs() < 1e-9);
+        // Scenario 1: Agent goes to a non-crowded bar (2 points)
+        // Agent predicts 0.0, so `went_to_bar` will be true.
+        // Actual attendance is 0.2, so `bar_is_overcrowded` is false.
+        agent.update_performance(true, 0.2);
+        assert_eq!(agent.performance_history, vec![2.0]);
+        assert!((agent.performance() - 2.0).abs() < 1e-9);
+
+        // Scenario 2: Agent stays home from a crowded bar (1 point)
+        // Agent predicts 0.7, so `went_to_bar` will be false.
+        // Actual attendance is 0.7, so `bar_is_overcrowded` is true.
+        agent.update_performance(false, 0.7);
+        assert_eq!(agent.performance_history, vec![2.0, 1.0]);
+        assert!((agent.performance() - 3.0).abs() < 1e-9);
+
+        // Scenario 3: Agent goes to a crowded bar (0 points)
+        agent.update_performance(true, 0.8);
+        assert_eq!(agent.performance_history, vec![2.0, 1.0, 0.0]);
+        assert!((agent.performance() - 3.0).abs() < 1e-9);
+
+        // Scenario 4: Agent stays home from a non-crowded bar (0 points)
+        agent.update_performance(false, 0.3);
+        assert_eq!(agent.performance_history, vec![2.0, 1.0, 0.0, 0.0]);
+        assert!((agent.performance() - 3.0).abs() < 1e-9);
 
         // Test with empty history
         let agent_no_history = Agent::new(Arc::new(NeverGo));
         assert!((agent_no_history.performance() - 0.0).abs() < 1e-9);
-
-        // Test max error results in 0 performance
-        let mut agent_max_error = Agent::new(Arc::new(AlwaysGo));
-        agent_max_error.last_prediction = Some(0.0);
-        agent_max_error.update_performance(1.0); // prediction 0.0, actual 1.0 -> error 1.0
-        // Performance = (1.0 - 1.0) * 100.0 = 0.0
-        assert!((agent_max_error.performance() - 0.0).abs() < 1e-9);
-
-        // Test zero error results in 100 performance
-        let mut agent_zero_error = Agent::new(Arc::new(AlwaysGo));
-        agent_zero_error.last_prediction = Some(0.0);
-        agent_zero_error.update_performance(0.0); // prediction 0.0, actual 0.0 -> error 0.0
-        // Performance = (1.0 - 0.0) * 100.0 = 100.0
-        assert!((agent_zero_error.performance() - 100.0).abs() < 1e-9);
     }
 } 

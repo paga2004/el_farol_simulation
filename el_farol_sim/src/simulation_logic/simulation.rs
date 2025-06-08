@@ -21,11 +21,29 @@ pub struct SimulationConfig {
     pub start_random: bool,
 }
 
+impl Default for SimulationConfig {
+    fn default() -> Self {
+        Self {
+            grid_size: 10,
+            neighbor_distance: 1,
+            temperature: 10.0,
+            policy_retention_rate: 0.5,
+            rounds_per_update: 10,
+            initial_strategies: Vec::new(),
+            start_random: true,
+            name: "Default Simulation".to_string(),
+            description: "A default simulation configuration".to_string(),
+            num_iterations: 100,
+        }
+    }
+}
+
 pub struct Simulation {
     game: Game,
     config: SimulationConfig,
     statistics: HashMap<String, Vec<f64>>,
     strategy_map: HashMap<String, StrategyId>,
+    current_round: usize,
 }
 
 impl Simulation {
@@ -134,17 +152,19 @@ impl Simulation {
             config,
             statistics: HashMap::new(),
             strategy_map,
+            current_round: 0,
         };
 
         sim
     }
 
     pub fn run_iteration(&mut self) -> Frame {
-        for _round in 0..self.config.rounds_per_update {
-            self.game.run();
-        }
-        self.adapt_strategies();
+        self.game.run();
 
+        self.current_round += 1;
+        if self.current_round % self.config.rounds_per_update == 0 {
+            self.adapt_strategies();
+        }
         
         let grid = self.game.get_grid();
         let policy_ids = grid.mapv(|agent| {
@@ -227,11 +247,11 @@ mod tests {
             temperature: 1.0,
             policy_retention_rate: 0.5,
             num_iterations: 10,
-            rounds_per_update: 1,
+            rounds_per_update: 10,
             initial_strategies: vec![Arc::new(AlwaysGo), Arc::new(NeverGo)],
             start_random: true,
         };
-        let simulation = Simulation::new(config);
-        assert_eq!(simulation.get_statistics().len(), 0);
+        let sim = Simulation::new(config);
+        assert_eq!(sim.config.grid_size, 2);
     }
 } 

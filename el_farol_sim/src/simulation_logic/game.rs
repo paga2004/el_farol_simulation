@@ -22,9 +22,12 @@ impl Game {
             .collect();
 
         let mut attendance = 0;
+        let mut went_to_bar_list = Vec::new();
         for (agent, &prediction) in self.grid.iter_mut().zip(predictions.iter()) {
             agent.last_prediction = Some(prediction);
-            if prediction < 0.6 {
+            let went_to_bar = prediction < 0.6;
+            went_to_bar_list.push(went_to_bar);
+            if went_to_bar {
                 attendance += 1;
             }
         }
@@ -37,8 +40,8 @@ impl Game {
         };
 
         // Update agent performances based on their prediction accuracy
-        for agent in self.grid.iter_mut() {
-            agent.update_performance(actual_attendance_ratio);
+        for (i, agent) in self.grid.iter_mut().enumerate() {
+            agent.update_performance(went_to_bar_list[i], actual_attendance_ratio);
         }
 
         // Record game result
