@@ -26,11 +26,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
     let initial_strategies: Vec<Arc<dyn el_farol_lib::simulation_logic::policy::Policy>> = vec![
-        Arc::new(AlwaysGo),
-        Arc::new(NeverGo),
+       // Arc::new(AlwaysGo),
+      //  Arc::new(NeverGo),
         Arc::new(PredictFromYesterday),
         Arc::new(PredictFromDayBeforeYesterday),
-        // Arc::new(RandomPolicy),
+        Arc::new(RandomPolicy),
         Arc::new(MovingAveragePolicy::<3>),
         // Arc::new(MovingAveragePolicy::<5>),
         Arc::new(MovingAveragePolicy::<10>),
@@ -47,20 +47,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Arc::new(ExponentialMovingAveragePolicy::new(0.1)),
         // Arc::new(ExponentialMovingAveragePolicy::new(0.5)),
         // Arc::new(ExponentialMovingAveragePolicy::new(0.9)),
-        // Arc::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
-        // Arc::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
-        // Arc::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
+         Arc::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
+        Arc::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
+        Arc::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
     ];
     let strategy_names: Vec<String> = initial_strategies.iter().map(|p| p.name()).collect();
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "better-retention-rate-mechanism".to_string(),
-        description: "A simulation with all available non random policies, but with a better retention rate mechanism.".to_string(),
+        name: "really_high_retention_rate".to_string(),
+        description: "Looks like the key is to have a really high retention rate".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
-        temperature: 0.0,
-        policy_retention_rate: 0.2,
+        temperature: 0.1,
+        policy_retention_rate: 0.8,
         num_iterations: 1000,
         rounds_per_update: 1,
         initial_strategies,
