@@ -5,6 +5,7 @@ use crate::{Frame, StrategyId};
 use ndarray::Array2;
 use rand::Rng;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct SimulationConfig {
@@ -16,7 +17,7 @@ pub struct SimulationConfig {
     pub policy_retention_rate: f64,
     pub num_iterations: usize,
     pub rounds_per_update: usize,
-    pub initial_strategies: Vec<Box<dyn Policy>>,
+    pub initial_strategies: Vec<Arc<dyn Policy>>,
     pub start_random: bool,
 }
 
@@ -64,7 +65,7 @@ impl Simulation {
                 .initial_strategies
                 .iter()
                 .find(|p| p.name() == base_policy_name)
-                .map(|p| p.clone_box())
+                .map(|p| p.clone())
                 .unwrap_or_else(|| {
                     eprintln!(
                         "Warning: Policy 'Never Go' not found in initial_strategies. Using the first available strategy as base."
@@ -72,25 +73,25 @@ impl Simulation {
                     if config.initial_strategies.is_empty() {
                         panic!("Initial strategies cannot be empty for non-random setup if 'Never Go' is missing.");
                     }
-                    config.initial_strategies[0].clone_box()
+                    config.initial_strategies[0].clone()
                 });
 
-            let other_policies: Vec<Box<dyn Policy>> = config
+            let other_policies: Vec<Arc<dyn Policy>> = config
                 .initial_strategies
                 .iter()
                 .filter(|p| p.name() != base_policy.name()) // Filter out the base policy by name
-                .map(|p| p.clone_box())
+                .map(|p| p.clone())
                 .collect();
 
             // Initialize all cells with the base policy
             grid = Array2::from_elem(
                 (config.grid_size, config.grid_size),
-                Agent::new(base_policy.clone_box()),
+                Agent::new(base_policy.clone()),
             ); // Placeholder coords, actual in loop
 
             for r in 0..config.grid_size {
                 for c in 0..config.grid_size {
-                    grid[[r, c]] = Agent::new(base_policy.clone_box());
+                    grid[[r, c]] = Agent::new(base_policy.clone());
                 }
             }
 
@@ -99,26 +100,26 @@ impl Simulation {
                 if gs > 0 {
                     // Top-left
                     grid[[0, 0]] =
-                        Agent::new(other_policies[0 % other_policies.len()].clone_box());
+                        Agent::new(other_policies[0 % other_policies.len()].clone());
 
                     // Top-right
                     if gs > 1 {
                         grid[[0, gs - 1]] =
-                            Agent::new(other_policies[1 % other_policies.len()].clone_box());
+                            Agent::new(other_policies[1 % other_policies.len()].clone());
                     }
 
                     // Bottom-left
                     if gs > 1 {
                         // Also implies gs > 0 already checked
                         grid[[gs - 1, 0]] =
-                            Agent::new(other_policies[2 % other_policies.len()].clone_box());
+                            Agent::new(other_policies[2 % other_policies.len()].clone());
                     }
 
                     // Bottom-right
                     if gs > 1 {
                         // Also implies gs > 0 already checked
                         grid[[gs - 1, gs - 1]] =
-                            Agent::new(other_policies[3 % other_policies.len()].clone_box());
+                            Agent::new(other_policies[3 % other_policies.len()].clone());
                     }
                 }
             } else {
@@ -214,6 +215,7 @@ impl Simulation {
 mod tests {
     use super::*;
     use super::super::policy::{AlwaysGo, NeverGo};
+    use std::sync::Arc;
 
     #[test]
     fn test_simulation_creation() {
@@ -226,7 +228,7 @@ mod tests {
             policy_retention_rate: 0.5,
             num_iterations: 10,
             rounds_per_update: 1,
-            initial_strategies: vec![Box::new(AlwaysGo), Box::new(NeverGo)],
+            initial_strategies: vec![Arc::new(AlwaysGo), Arc::new(NeverGo)],
             start_random: true,
         };
         let simulation = Simulation::new(config);

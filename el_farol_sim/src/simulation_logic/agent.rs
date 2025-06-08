@@ -1,17 +1,20 @@
 use super::policy::Policy;
+use crate::simulation_logic::game::Game;
+use rand::seq::SliceRandom;
 use rand::Rng;
+use std::sync::Arc;
 use std::fmt::Debug;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Agent {
-    current_policy: Box<dyn Policy>,
+    current_policy: Arc<dyn Policy>,
     pub performance_history: Vec<f64>, // Stores absolute prediction error
     pub last_prediction: Option<f64>, // Stores the last prediction made by the policy
 }
 
 impl Agent {
-    pub fn new(initial_policy: Box<dyn Policy>) -> Self {
+    pub fn new(initial_policy: Arc<dyn Policy>) -> Self {
         Self {
             current_policy: initial_policy,
             performance_history: Vec::new(),
@@ -38,8 +41,14 @@ impl Agent {
         ( (1.0 - avg_error).max(0.0) ) * 100.0
     }
 
-    pub fn current_policy(&self) -> &dyn Policy {
-        self.current_policy.as_ref()
+    pub fn current_policy(&self) -> Arc<dyn Policy> {
+        self.current_policy.clone()
+    }
+
+    pub fn decide(&mut self, history: &[f64]) -> f64 {
+        let prediction = self.current_policy.decide(history);
+        self.last_prediction = Some(prediction);
+        prediction
     }
 
     pub fn adapt_strategy(&mut self, neighbors: &[(&Agent, f64)], temperature: f64, policy_retention_rate: f64) {
@@ -101,8 +110,10 @@ impl Agent {
         for (i, prob) in probabilities.iter().enumerate() {
             cumulative += prob;
             if random_value <= cumulative {
+                if self.current_policy.name() != neighbors[i].0.current_policy.name() {
+                    self.performance_history.clear();
+                }
                 self.current_policy = neighbors[i].0.current_policy.clone();
-                self.performance_history = Vec::new();
                 break;
             }
         }
@@ -113,6 +124,16 @@ impl Agent {
     }
 }
 
+impl Clone for Agent {
+    fn clone(&self) -> Self {
+        Self {
+            current_policy: self.current_policy.clone(),
+            performance_history: self.performance_history.clone(),
+            last_prediction: self.last_prediction,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_agent_performance() {
-        let mut agent = Agent::new(Box::new(AlwaysGo)); // AlwaysGo predicts 0.0 (ratio)
+        let mut agent = Agent::new(Arc::new(AlwaysGo)); // AlwaysGo predicts 0.0 (ratio)
         
         // Round 1: Agent predicts 0.0. Actual attendance is 0.2 (20% ratio).
         agent.last_prediction = Some(0.0);
@@ -138,18 +159,18 @@ mod tests {
         assert!((agent.performance() - 55.0).abs() < 1e-9);
 
         // Test with empty history
-        let agent_no_history = Agent::new(Box::new(NeverGo));
+        let agent_no_history = Agent::new(Arc::new(NeverGo));
         assert!((agent_no_history.performance() - 0.0).abs() < 1e-9);
 
         // Test max error results in 0 performance
-        let mut agent_max_error = Agent::new(Box::new(AlwaysGo));
+        let mut agent_max_error = Agent::new(Arc::new(AlwaysGo));
         agent_max_error.last_prediction = Some(0.0);
         agent_max_error.update_performance(1.0); // prediction 0.0, actual 1.0 -> error 1.0
         // Performance = (1.0 - 1.0) * 100.0 = 0.0
         assert!((agent_max_error.performance() - 0.0).abs() < 1e-9);
 
         // Test zero error results in 100 performance
-        let mut agent_zero_error = Agent::new(Box::new(AlwaysGo));
+        let mut agent_zero_error = Agent::new(Arc::new(AlwaysGo));
         agent_zero_error.last_prediction = Some(0.0);
         agent_zero_error.update_performance(0.0); // prediction 0.0, actual 0.0 -> error 0.0
         // Performance = (1.0 - 0.0) * 100.0 = 100.0

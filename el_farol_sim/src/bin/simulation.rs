@@ -18,37 +18,38 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use chrono;
+use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn Error>> {
     dotenvy::dotenv().ok();
     // Initialize logging
     env_logger::init();
 
-    let initial_strategies: Vec<Box<dyn el_farol_lib::simulation_logic::policy::Policy>> = vec![
-        Box::new(AlwaysGo),
-        Box::new(NeverGo),
-        Box::new(PredictFromYesterday),
-        Box::new(PredictFromDayBeforeYesterday),
-        Box::new(RandomPolicy),
-        // Box::new(MovingAveragePolicy::<3>),
-        // Box::new(MovingAveragePolicy::<5>),
-        // Box::new(MovingAveragePolicy::<10>),
-        Box::new(FullHistoryAveragePolicy),
-        Box::new(EvenHistoryAveragePolicy),
-        Box::new(ComplexFormulaPolicy),
-        Box::new(DrunkardPolicy),
-        Box::new(StupidNerdPolicy),
-        // Box::new(UniformPolicy::new(0.0, 1.0)),
-        // Box::new(UniformPolicy::new(0.25, 0.75)),
-        // Box::new(UniformPolicy::new(0.4, 0.6)),
-        Box::new(WeightedHistoryPolicy::new()),
-        // Box::new(SlidingWeightedAveragePolicy::new()),
-        // Box::new(ExponentialMovingAveragePolicy::new(0.1)),
-        // Box::new(ExponentialMovingAveragePolicy::new(0.5)),
-        // Box::new(ExponentialMovingAveragePolicy::new(0.9)),
-        // Box::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
-        // Box::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
-        // Box::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
+    let initial_strategies: Vec<Arc<dyn el_farol_lib::simulation_logic::policy::Policy>> = vec![
+        Arc::new(AlwaysGo),
+        Arc::new(NeverGo),
+        Arc::new(PredictFromYesterday),
+        Arc::new(PredictFromDayBeforeYesterday),
+        Arc::new(RandomPolicy),
+        // Arc::new(MovingAveragePolicy::<3>),
+        // Arc::new(MovingAveragePolicy::<5>),
+        // Arc::new(MovingAveragePolicy::<10>),
+        Arc::new(FullHistoryAveragePolicy),
+        Arc::new(EvenHistoryAveragePolicy),
+        Arc::new(ComplexFormulaPolicy),
+        Arc::new(DrunkardPolicy),
+        Arc::new(StupidNerdPolicy),
+        // Arc::new(UniformPolicy::new(0.0, 1.0)),
+        // Arc::new(UniformPolicy::new(0.25, 0.75)),
+        // Arc::new(UniformPolicy::new(0.4, 0.6)),
+        Arc::new(WeightedHistoryPolicy::new()),
+        // Arc::new(SlidingWeightedAveragePolicy::new()),
+        // Arc::new(ExponentialMovingAveragePolicy::new(0.1)),
+        // Arc::new(ExponentialMovingAveragePolicy::new(0.5)),
+        // Arc::new(ExponentialMovingAveragePolicy::new(0.9)),
+        // Arc::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
+        // Arc::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
+        // Arc::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
     ];
     let strategy_names: Vec<String> = initial_strategies.iter().map(|p| p.name()).collect();
 
@@ -58,7 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         description: "A simulation with all available non random policies.".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
-        temperature: 1.0,
+        temperature: 0.0,
         policy_retention_rate: 0.02,
         num_iterations: 200,
         rounds_per_update: 1,

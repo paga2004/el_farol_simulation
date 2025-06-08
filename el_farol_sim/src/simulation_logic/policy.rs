@@ -1,33 +1,14 @@
 use std::fmt::Debug;
 use rand::distributions::{Distribution, Uniform};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Trait defining the behavior of a policy
-pub trait Policy: Send + Sync + Debug + ClonePolicy {
+pub trait Policy: Send + Sync + Debug {
     /// Makes a prediction of bar attendance ratio (0.0-1.0) based on the history of past games
     fn decide(&self, history: &[f64]) -> f64;
     
     /// Returns a name for the policy
     fn name(&self) -> String;
-}
-
-pub trait ClonePolicy {
-    fn clone_box(&self) -> Box<dyn Policy>;
-}
-
-impl<T> ClonePolicy for T
-where
-    T: 'static + Policy + Clone,
-{
-    fn clone_box(&self) -> Box<dyn Policy> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn Policy> {
-    fn clone(&self) -> Box<dyn Policy> {
-        self.clone_box()
-    }
 }
 
 /// Always goes to the bar
