@@ -1,24 +1,23 @@
-# discrete_payoff_matrix_with_random_policy
+# discrete_payoff_matrix_no_random_policy
 
-the random policy always wins
+without a random policy there seems to be some equilibrium between the strategies but the surviving strategies are not always the same on each run
 
 ## Configuration
 
 ```
-name = "discrete_payoff_matrix_with_random_policy"
+name = "discrete_payoff_matrix_no_random_policy"
 description = "the random policy always wins"
 grid_size = 100
 neighbor_distance = 1
 temperature = 1.0
-policy_retention_rate = 0.5
-num_iterations = 1000
+policy_retention_rate = 0.2
+num_iterations = 2000
 rounds_per_update = 1
 initial_strategies = [
     "Always Go",
     "Never Go",
     "Predict from yesterday",
     "Predict from day before yesterday",
-    "Random",
     "Moving Average (3)",
     "Moving Average (5)",
     "Moving Average (10)",
@@ -44,8 +43,8 @@ start_random = true
 ## States
 
 ![state_0000.png](readme_pictures/state_0000.png)
-![state_0249.png](readme_pictures/state_0249.png)
 ![state_0499.png](readme_pictures/state_0499.png)
-![state_0749.png](readme_pictures/state_0749.png)
 ![state_0999.png](readme_pictures/state_0999.png)
+![state_1499.png](readme_pictures/state_1499.png)
+![state_1999.png](readme_pictures/state_1999.png)
 

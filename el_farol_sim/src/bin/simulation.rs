@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Arc::new(NeverGo),
         Arc::new(PredictFromYesterday),
         Arc::new(PredictFromDayBeforeYesterday),
-        Arc::new(RandomPolicy),
+        //Arc::new(RandomPolicy),
        Arc::new(MovingAveragePolicy::<3>),
        Arc::new(MovingAveragePolicy::<5>),
         Arc::new(MovingAveragePolicy::<10>),
@@ -55,13 +55,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "discrete_payoff_matrix_with_random_policy".to_string(),
+        name: "discrete_payoff_matrix_no_random_policy".to_string(),
         description: "the random policy always wins".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
         temperature: 1.0,
-        policy_retention_rate: 0.5,
-        num_iterations: 1000,
+        policy_retention_rate: 0.2,
+        num_iterations: 2000,
         rounds_per_update: 1,
         initial_strategies,
         start_random: true,

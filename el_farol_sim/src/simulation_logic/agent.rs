@@ -25,7 +25,7 @@ impl Agent {
     pub fn update_performance(&mut self, went_to_bar: bool, actual_attendance_ratio: f64) {
         let bar_is_overcrowded = actual_attendance_ratio >= 0.6;
         let score = match (went_to_bar, bar_is_overcrowded) {
-            (true, false) => 2.0, // Went to a non-crowded bar
+            (true, false) => 1.0, // Went to a non-crowded bar
             (false, true) => 1.0, // Stayed home from a crowded bar
             _ => 0.0,             // Other cases
         };
