@@ -158,7 +158,7 @@ fn plot_statistics(
         }
     }
     plot_attendance(&statistics, output_dir)?;
-    plot_strategy_distribution(&statistics, output_dir)?;
+    plot_strategy_distribution(&statistics, output_dir, &simulation_data.config.initial_strategies)?;
     Ok(())
 }
 
@@ -194,29 +194,34 @@ fn plot_strategy_predictions(
 
     let max_iterations = simulation_data.frames.len();
     let mut chart = ChartBuilder::on(&root)
-        .caption("Strategy Predictions Over Time", ("sans-serif", 40))
-        .margin(10)
-        .x_label_area_size(40)
-        .y_label_area_size(40)
+        .caption("Strategy predictions over time", ("sans-serif", 40))
+        .margin_left(20)
+        .margin_right(40)
+        .margin_top(20)
+        .margin_bottom(20)
+        .x_label_area_size(60)
+        .y_label_area_size(60)
         .build_cartesian_2d(0f32..max_iterations as f32, 0f32..1f32)?;
 
     chart
         .configure_mesh()
         .x_desc("Iteration")
-        .y_desc("Predicted Attendance Ratio")
+        .y_desc("Predicted attendance ratio")
+        .axis_desc_style(("sans-serif", 32).into_font())
+        .label_style(("sans-serif", 24).into_font())
+        .x_label_formatter(&|x| format!("{}", *x as i32))
         .draw()?;
 
-    let colors = vec![&RED, &BLUE, &GREEN, &YELLOW, &MAGENTA, &CYAN, &BLACK, &RGBColor(255, 165, 0), &RGBColor(128, 0, 128), &RGBColor(255, 192, 203)];
     for (i, strategy_name) in initial_strategies.iter().enumerate() {
         if let Some(preds) = strategy_prediction_series.get(strategy_name) {
-            let color = colors[i % colors.len()];
+            let color = get_strategy_plot_color(i);
             chart
                 .draw_series(LineSeries::new(
                     preds.iter().map(|(x, y)| (*x as f32, *y as f32)),
-                    color,
+                    &color,
                 ))?
                 .label(strategy_name)
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color));
+                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &color));
         }
     }
 
@@ -224,6 +229,7 @@ fn plot_strategy_predictions(
         .configure_series_labels()
         .background_style(&WHITE.mix(0.8))
         .border_style(&BLACK)
+        .label_font(("sans-serif", 16))
         .draw()?;
 
     Ok(())
@@ -242,16 +248,22 @@ fn plot_attendance(
     root.fill(&WHITE)?;
 
     let mut chart = ChartBuilder::on(&root)
-        .caption("Attendance Ratio Over Time", ("sans-serif", 40))
-        .margin(5)
-        .x_label_area_size(30)
-        .y_label_area_size(30)
+        .caption("Attendance ratio over time", ("sans-serif", 40))
+        .margin_left(20)
+        .margin_right(40)
+        .margin_top(20)
+        .margin_bottom(20)
+        .x_label_area_size(60)
+        .y_label_area_size(60)
         .build_cartesian_2d(0f32..attendance.len() as f32, 0f32..1f32)?;
 
     chart
         .configure_mesh()
         .x_desc("Iteration")
-        .y_desc("Attendance Ratio")
+        .y_desc("Attendance ratio")
+        .axis_desc_style(("sans-serif", 32).into_font())
+        .label_style(("sans-serif", 24).into_font())
+        .x_label_formatter(&|x| format!("{}", *x as i32))
         .draw()?;
 
     chart.draw_series(LineSeries::new(
@@ -265,12 +277,59 @@ fn plot_attendance(
     Ok(())
 }
 
+fn get_strategy_colors() -> Vec<Rgb<u8>> {
+    vec![
+        Rgb([220, 50, 47]),   // Red
+        Rgb([38, 139, 210]),  // Blue  
+        Rgb([133, 153, 0]),   // Green
+        Rgb([181, 137, 0]),   // Yellow
+        Rgb([211, 54, 130]),  // Magenta
+        Rgb([42, 161, 152]),  // Cyan
+        Rgb([88, 110, 117]),  // Gray
+        Rgb([108, 113, 196]), // Purple
+        Rgb([147, 161, 161]), // Light Gray
+        Rgb([255, 85, 85]),   // Light Red
+        Rgb([85, 170, 255]),  // Light Blue
+        Rgb([170, 255, 85]),  // Light Green
+        Rgb([255, 170, 85]),  // Orange
+        Rgb([255, 85, 170]),  // Pink
+        Rgb([85, 255, 170]),  // Mint
+        Rgb([170, 85, 255]),  // Violet
+        Rgb([85, 85, 85]),    // Dark Gray
+    ]
+}
+
+fn get_strategy_plot_color(index: usize) -> RGBColor {
+    let colors = [
+        (220, 50, 47),   // Red
+        (38, 139, 210),  // Blue  
+        (133, 153, 0),   // Green
+        (181, 137, 0),   // Yellow
+        (211, 54, 130),  // Magenta
+        (42, 161, 152),  // Cyan
+        (88, 110, 117),  // Gray
+        (108, 113, 196), // Purple
+        (147, 161, 161), // Light Gray
+        (255, 85, 85),   // Light Red
+        (85, 170, 255),  // Light Blue
+        (170, 255, 85),  // Light Green
+        (255, 170, 85),  // Orange
+        (255, 85, 170),  // Pink
+        (85, 255, 170),  // Mint
+        (170, 85, 255),  // Violet
+        (85, 85, 85),    // Dark Gray
+    ];
+    let (r, g, b) = colors[index % colors.len()];
+    RGBColor(r, g, b)
+}
+
 fn plot_strategy_distribution(
     statistics: &HashMap<String, Vec<f64>>,
     output_dir: &str,
+    initial_strategies: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(output_dir).join("strategy_distribution.png");
-    let root = BitMapBackend::new(&path, (800, 600)).into_drawing_area();
+    let root = BitMapBackend::new(&path, (1060, 600)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let max_iterations = statistics
@@ -287,109 +346,192 @@ fn plot_strategy_distribution(
     };
 
     let mut chart = ChartBuilder::on(&root)
-        .caption("Strategy Distribution Over Time", ("sans-serif", 40))
-        .margin(5)
-        .x_label_area_size(30)
-        .y_label_area_size(30)
+        .caption("Strategy distribution over time", ("sans-serif", 40))
+        .margin_left(20)
+        .margin_right(300)
+        .margin_top(20)
+        .margin_bottom(20)
+        .x_label_area_size(60)
+        .y_label_area_size(80)
         .build_cartesian_2d(0f32..x_axis_max, 0f32..1f32)?;
 
     chart
         .configure_mesh()
         .x_desc("Iteration")
-        .y_desc("Strategy Ratio")
+        .y_desc("Strategy ratio")
+        .axis_desc_style(("sans-serif", 32).into_font())
+        .label_style(("sans-serif", 24).into_font())
+        .x_label_formatter(&|x| format!("{}", *x as i32))
         .draw()?;
 
-    let colors = vec![&RED, &BLUE, &GREEN, &YELLOW, &MAGENTA, &CYAN];
-    let mut color_idx = 0;
+    // Store series for manual legend drawing
+    let mut legend_items: Vec<(String, RGBColor)> = Vec::new();
 
-    for (key, values) in statistics.iter() {
-        if key.starts_with("strategy_") {
+    // Use the same order as the original simulation configuration
+    for (strategy_idx, strategy_name) in initial_strategies.iter().enumerate() {
+        let key = format!("strategy_{}", strategy_name);
+        if let Some(values) = statistics.get(&key) {
             if values.is_empty() {
                 continue;
             }
-            let strategy_name = key.trim_start_matches("strategy_");
-            let color = colors[color_idx % colors.len()];
+            let color = get_strategy_plot_color(strategy_idx);
+            legend_items.push((strategy_name.clone(), color));
 
-            chart
-                .draw_series(LineSeries::new(
-                    values
-                        .iter()
-                        .enumerate()
-                        .map(|(x, &y)| (x as f32, y as f32)),
-                    *color,
-                ))?
-                .label(strategy_name)
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], *color));
-            color_idx += 1;
+            chart.draw_series(LineSeries::new(
+                values
+                    .iter()
+                    .enumerate()
+                    .map(|(x, &y)| (x as f32, y as f32)),
+                &color,
+            ))?;
         }
     }
 
-    chart
-        .configure_series_labels()
-        .background_style(&WHITE.mix(0.8))
-        .border_style(&BLACK)
-        .draw()?;
+    // Draw manual legend in the right margin area
+    let legend_start_x = 780; // Start legend in the right margin
+    let legend_style = TextStyle::from(("sans-serif", 16).into_font()).color(&BLACK);
+    
+    for (i, (strategy_name, color)) in legend_items.iter().enumerate() {
+        let y_pos = 80 + i as i32 * 25;
+        
+        // Draw color line
+        root.draw(&PathElement::new(
+            vec![(legend_start_x, y_pos), (legend_start_x + 20, y_pos)],
+            color.stroke_width(2),
+        ))?;
+        
+        // Draw strategy name
+        root.draw(&Text::new(
+            strategy_name.as_str(),
+            (legend_start_x + 25, y_pos - 5),
+            legend_style.clone(),
+        ))?;
+    }
 
+    root.present()?;
     Ok(())
 }
 
 fn visualize_grid_state(
     frame: &Frame,
     iteration_num: usize,
-    _strategies: &[String],
+    strategies: &[String],
     grid_states_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (grid_height, grid_width) = (
         frame.policy_ids.nrows(),
         frame.policy_ids.ncols(),
     );
-    let cell_size = 20u32;
-    let img_width = grid_width as u32 * cell_size;
-    let img_height = grid_height as u32 * cell_size + 80;
+    let cell_size = 8u32; // Increased from 20 to make cells more visible
+    let legend_width = 300u32;
+    let info_height = 120u32; // More space for text information
+    let img_width = grid_width as u32 * cell_size + legend_width;
+    let img_height = grid_height as u32 * cell_size + info_height;
 
     let mut img = RgbImage::new(img_width, img_height);
     draw_filled_rect_mut(&mut img, Rect::at(0, 0).of_size(img_width, img_height), Rgb([255u8, 255, 255]));
 
-    let strategy_colors = [
-        Rgb([255, 0, 0]), Rgb([0, 0, 255]), Rgb([0, 255, 0]),
-        Rgb([255, 255, 0]), Rgb([255, 0, 255]), Rgb([0, 255, 255]),
-        Rgb([128, 0, 0]), Rgb([0, 128, 0]), Rgb([0, 0, 128]),
-        Rgb([128, 128, 0]), Rgb([128, 0, 128]), Rgb([0, 128, 128]),
-        Rgb([128, 128, 128]), Rgb([192, 192, 192]), Rgb([255, 165, 0]),
-        Rgb([255, 192, 203]), Rgb([75, 0, 130]),
-    ];
+    let strategy_colors = get_strategy_colors();
 
+    // Count strategy distribution
+    let mut strategy_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    for policy_id in frame.policy_ids.iter() {
+        *strategy_counts.entry(*policy_id as usize).or_insert(0) += 1;
+    }
+
+    // Draw grid with cells
     for r in 0..grid_height {
         for c in 0..grid_width {
             let policy_id = frame.policy_ids[[r, c]] as usize;
             let color = strategy_colors[policy_id % strategy_colors.len()];
+            let x = c as i32 * cell_size as i32;
+            let y = r as i32 * cell_size as i32;
+            
+            // Draw filled cell
             draw_filled_rect_mut(
                 &mut img,
-                Rect::at((c as i32) * (cell_size as i32), (r as i32) * (cell_size as i32))
-                    .of_size(cell_size, cell_size),
+                Rect::at(x, y).of_size(cell_size, cell_size),
                 color,
             );
         }
     }
 
+    // Draw legend color swatches directly on image
+    let legend_x = (grid_width as u32 * cell_size + 20) as i32;
+    let legend_start_y = 20i32;
+    for (i, _strategy_name) in strategies.iter().enumerate() {
+        let y_pos = legend_start_y + 25 + (i as i32 * 18);
+        let color = strategy_colors[i % strategy_colors.len()];
+        
+        // Draw color swatch
+        draw_filled_rect_mut(
+            &mut img,
+            Rect::at(legend_x, y_pos - 5).of_size(12, 12),
+            color,
+        );
+    }
+
+    // Now use plotters for text rendering
     {
         let root = BitMapBackend::with_buffer(img.as_mut(), (img_width, img_height)).into_drawing_area();
 
-        let text_style = TextStyle::from(("sans-serif", 20.0).into_font()).color(&BLACK);
+        // Legend title
+        let legend_title_style = TextStyle::from(("sans-serif", 18.0).into_font()).color(&BLACK);
+        root.draw(&Text::new(
+            "Strategies",
+            (legend_x, legend_start_y),
+            legend_title_style,
+        ))?;
 
-        let text_y_pos = grid_height as i32 * cell_size as i32 + 10;
+        // Draw legend entries
+        let legend_entry_style = TextStyle::from(("sans-serif", 16.0).into_font()).color(&BLACK);
+        for (i, strategy_name) in strategies.iter().enumerate() {
+            let y_pos = legend_start_y + 25 + (i as i32 * 18);
+            
+            // Count for this strategy
+            let count = strategy_counts.get(&i).unwrap_or(&0);
+            let percentage = (*count as f64 / (grid_width * grid_height) as f64) * 100.0;
+            
+            // Draw strategy name and percentage
+            root.draw(&Text::new(
+                format!("{} ({:.1}%)", strategy_name, percentage),
+                (legend_x + 18, y_pos),
+                legend_entry_style.clone(),
+            ))?;
+        }
+
+        // Draw information text at bottom
+        let info_y_start = (grid_height as u32 * cell_size + 20) as i32;
+        let info_style = TextStyle::from(("sans-serif", 18.0).into_font()).color(&BLACK);
+        let info_small_style = TextStyle::from(("sans-serif", 16.0).into_font()).color(&BLACK);
+        
         root.draw(&Text::new(
             format!("Iteration: {}", iteration_num),
-            (10, text_y_pos),
-            text_style.clone(),
+            (20, info_y_start),
+            info_style.clone(),
         ))?;
         
-        let attendance_y_pos = text_y_pos + 25;
         root.draw(&Text::new(
-            format!("Attendance: {:.2}%", frame.attendance_ratio * 100.0),
-            (10, attendance_y_pos),
-            text_style,
+            format!("Attendance: {:.1}% ({} agents)", 
+                frame.attendance_ratio * 100.0,
+                (frame.attendance_ratio * (grid_width * grid_height) as f64) as usize
+            ),
+            (20, info_y_start + 25),
+            info_style.clone(),
         ))?;
+
+        // Find and display dominant strategy
+        if let Some((dominant_id, dominant_count)) = strategy_counts.iter().max_by_key(|(_, &count)| count) {
+            let dominant_percentage = (*dominant_count as f64 / (grid_width * grid_height) as f64) * 100.0;
+            root.draw(&Text::new(
+                format!("Dominant: {} ({:.1}%)", 
+                    strategies[*dominant_id], 
+                    dominant_percentage
+                ),
+                (20, info_y_start + 50),
+                info_small_style,
+            ))?;
+        }
     }
 
     let path = format!("{}/state_{:04}.png", grid_states_dir, iteration_num);
