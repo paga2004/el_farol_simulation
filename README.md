@@ -1,50 +1,93 @@
-# discrete_payoff_matrix_no_random_policy
+# El Farol Bar Simulation
 
-without a random policy there seems to be some equilibrium between the strategies but the surviving strategies are not always the same on each run
+This repository contains part of the code used for a report written for a game theory course. It is a grid-based simulation of the classic El Farol Bar problem implemented in Rust, where agents learn and adapt their strategies based on neighboring agents' performance.
+
+## Project Overview
+
+This simulation models the El Farol Bar problem in a spatial environment where agents are arranged on a grid and make decisions about whether to attend the bar based on past attendance patterns. Agents can observe their neighbors' strategies and adapt accordingly, leading to emergent patterns of behavior.
+
+## Project Structure
+
+### Core Simulation Code (`el_farol_sim/`)
+The main Rust implementation containing:
+
+- **`src/simulation_logic/`** - Core simulation components:
+  - `simulation.rs` - Main simulation engine and configuration
+  - `agent.rs` - Agent behavior and strategy adaptation logic  
+  - `game.rs` - Individual game iteration management
+  - `policy.rs` - Strategy implementations (AlwaysGo, NeverGo, RandomPolicy, MovingAverage, etc.)
+  - `mod.rs` - Module declarations
+
+- **`src/bin/`** - Executable binaries:
+  - `simulation.rs` - Main simulation runner
+  - `visualizer.rs` - Visualization and video generation tool
+
+- **`src/lib.rs`** - Library interface and data structures
+
+### Simulation Results (`simulations/`)
+Contains numbered experiment directories with different configurations and parameters. Each simulation directory includes:
+- Compressed simulation data files (`.bin.xz`)
+- Configuration files and metadata
+
+### Visualizations (`visualisation/`)
+Generated output from the visualizer including:
+- Grid state visualizations
+- Statistical plots
+- Generated videos
+
+### Results Analysis (`results/`)
+- `results.md` - Analysis and documentation of simulation results
+
+## How to Run
+
+### 1. Prerequisites
+
+You will need Rust and FFmpeg installed on your system.
+
+### 2. Environment Setup
+```bash
+# Navigate to the simulation directory
+cd el_farol_sim
+
+# Copy environment template (optional)
+cp .env_template .env
+
+# Set up environment variables (optional)
+export EL_FARO_HOME=/path/to/your/project/root
+```
+
+### 3. Running a Simulation
+```bash
+# Build and run the simulation
+cargo run --release --bin simulation
+```
+
+The simulation will generate compressed simulation data in the `simulations/` directory.
+
+### 4. Generating Visualizations
+```bash
+# Visualize simulation results (without video)
+cargo run --release --bin visualizer path/to/simulation_data.bin.xz
+
+# Generate visualization with video
+cargo run --release --bin visualizer path/to/simulation_data.bin.xz --video
+```
+
+This creates:
+- Grid state images for each iteration
+- Statistical plots (attendance, strategy distribution)
+- Strategy prediction charts
+- Optional MP4 video compilation
 
 ## Configuration
 
-```
-name = "discrete_payoff_matrix_no_random_policy"
-description = "the random policy always wins"
-grid_size = 100
-neighbor_distance = 1
-temperature = 1.0
-policy_retention_rate = 0.2
-num_iterations = 2000
-rounds_per_update = 1
-initial_strategies = [
-    "Always Go",
-    "Never Go",
-    "Predict from yesterday",
-    "Predict from day before yesterday",
-    "Moving Average (3)",
-    "Moving Average (5)",
-    "Moving Average (10)",
-    "Full History Average",
-    "Even History Average",
-    "Complex Formula",
-    "Drunkard",
-    "Stupid Nerd",
-    "Generalized Mean (m=5, r=1)",
-    "Generalized Mean (m=5, r=2)",
-    "Generalized Mean (m=5, r=-1)",
-]
-start_random = true
+### Simulation Parameters
+Key parameters in `SimulationConfig`:
 
-```
-
-## Statistics
-
-![attendance.png](readme_pictures/attendance.png)
-![strategy_distribution.png](readme_pictures/strategy_distribution.png)
-![strategy_predictions.png](readme_pictures/strategy_predictions.png)
-
-## States
-
-![state_0000.png](readme_pictures/state_0000.png)
-![state_0499.png](readme_pictures/state_0499.png)
-![state_0999.png](readme_pictures/state_0999.png)
-![state_1499.png](readme_pictures/state_1499.png)
-![state_1999.png](readme_pictures/state_1999.png)
-
+- `grid_size`: Size of the agent grid (e.g., 100x100)
+- `neighbor_distance`: Manhattan distance for neighbor evaluation
+- `temperature`: Softmax temperature for strategy adaptation
+- `policy_retention_rate`: Rate at which agents retain current strategies
+- `num_iterations`: Number of simulation rounds
+- `rounds_per_update`: Frequency of strategy updates
+- `initial_strategies`: Available strategy types

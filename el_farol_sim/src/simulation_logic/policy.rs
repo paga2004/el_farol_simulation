@@ -48,7 +48,7 @@ impl Policy for PredictFromYesterday {
         if let Some(last_ratio) = history.last() {
             *last_ratio
         } else {
-            0.0 // If no history, predict 0.0 attendance ratio
+            rand::random::<f64>()
         }
     }
 
@@ -63,7 +63,7 @@ pub struct PredictFromDayBeforeYesterday;
 
 impl Policy for PredictFromDayBeforeYesterday {
     fn decide(&self, history: &[f64]) -> f64 {
-        history.iter().rev().nth(1).or(history.last()).copied().unwrap_or(0.0)
+        history.iter().rev().nth(1).or(history.last()).copied().unwrap_or(rand::random::<f64>())
     }
 
     fn name(&self) -> String {
@@ -92,14 +92,14 @@ pub struct MovingAveragePolicy<const WINDOW_SIZE: usize>;
 impl<const WINDOW_SIZE: usize> Policy for MovingAveragePolicy<WINDOW_SIZE> {
     fn decide(&self, history: &[f64]) -> f64 {
         if history.is_empty() || WINDOW_SIZE == 0 {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let start = history.len().saturating_sub(WINDOW_SIZE);
         let relevant_history = &history[start..];
 
         if relevant_history.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let sum: f64 = relevant_history.iter().sum();
@@ -118,7 +118,7 @@ pub struct FullHistoryAveragePolicy;
 impl Policy for FullHistoryAveragePolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         if history.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
         history.iter().sum::<f64>() / history.len() as f64
     }
@@ -136,7 +136,7 @@ impl Policy for EvenHistoryAveragePolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         let even_day_history: Vec<f64> = history.iter().step_by(2).copied().collect();
         if even_day_history.is_empty() {
-            0.0
+            rand::random::<f64>() 
         } else {
             even_day_history.iter().sum::<f64>() / even_day_history.len() as f64
         }
@@ -175,7 +175,7 @@ pub struct DrunkardPolicy;
 impl Policy for DrunkardPolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         let avg = if history.is_empty() {
-            0.0
+            rand::random::<f64>() 
         } else {
             history.iter().sum::<f64>() / history.len() as f64
         };
@@ -194,7 +194,7 @@ pub struct StupidNerdPolicy;
 impl Policy for StupidNerdPolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         let avg = if history.is_empty() {
-            0.0
+            rand::random::<f64>() 
         } else {
             history.iter().sum::<f64>() / history.len() as f64
         };
@@ -266,7 +266,7 @@ impl Clone for WeightedHistoryPolicy {
 impl Policy for WeightedHistoryPolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         if history.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let mut weights = self.weights.lock().unwrap();
@@ -321,7 +321,7 @@ impl Default for SlidingWeightedAveragePolicy {
 impl Policy for SlidingWeightedAveragePolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         if history.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let window = &history[history.len().saturating_sub(5)..];
@@ -333,7 +333,7 @@ impl Policy for SlidingWeightedAveragePolicy {
             .sum();
 
         if window.is_empty() {
-            0.0
+            rand::random::<f64>()
         } else {
             weighted_sum / (window.len() as f64)
         }
@@ -360,7 +360,7 @@ impl ExponentialMovingAveragePolicy {
 impl Policy for ExponentialMovingAveragePolicy {
     fn decide(&self, history: &[f64]) -> f64 {
         if history.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let n = history.len() - 1;
@@ -403,7 +403,7 @@ impl<const M: usize> GeneralizedMeanPolicy<M> {
 impl<const M: usize> Policy for GeneralizedMeanPolicy<M> {
     fn decide(&self, history: &[f64]) -> f64 {
         if history.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let n = history.len();
@@ -411,7 +411,7 @@ impl<const M: usize> Policy for GeneralizedMeanPolicy<M> {
         let window = &history[n - window_size..];
 
         if window.is_empty() {
-            return 0.0;
+            return rand::random::<f64>();
         }
 
         let sum_of_powers: f64 = window.iter().map(|b| b.powf(self.r)).sum();

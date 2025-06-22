@@ -28,41 +28,41 @@ fn main() -> Result<(), Box<dyn Error>> {
     let initial_strategies: Vec<Arc<dyn el_farol_lib::simulation_logic::policy::Policy>> = vec![
         Arc::new(AlwaysGo),
         Arc::new(NeverGo),
-        Arc::new(PredictFromYesterday),
-        Arc::new(PredictFromDayBeforeYesterday),
-        //Arc::new(RandomPolicy),
-       Arc::new(MovingAveragePolicy::<3>),
-       Arc::new(MovingAveragePolicy::<5>),
-        Arc::new(MovingAveragePolicy::<10>),
-      Arc::new(FullHistoryAveragePolicy),
-        Arc::new(EvenHistoryAveragePolicy),
-        Arc::new(ComplexFormulaPolicy),
-      Arc::new(DrunkardPolicy),
-       Arc::new(StupidNerdPolicy),
-      // Arc::new(UniformPolicy::new(0.0, 1.0)),
-       //Arc::new(UniformPolicy::new(0.25, 0.75)),
-       // Arc::new(UniformPolicy::new(0.4, 0.6)),
-       // Arc::new(WeightedHistoryPolicy::new()),
-        // Arc::new(SlidingWeightedAveragePolicy::new()),
-        // Arc::new(ExponentialMovingAveragePolicy::new(0.1)),
-        // Arc::new(ExponentialMovingAveragePolicy::new(0.5)),
-        // Arc::new(ExponentialMovingAveragePolicy::new(0.9)),
-         Arc::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
-       Arc::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
-       Arc::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
+    //     Arc::new(PredictFromYesterday),
+    //     Arc::new(PredictFromDayBeforeYesterday),
+    //     Arc::new(RandomPolicy),
+    //     Arc::new(MovingAveragePolicy::<3>),
+    //     Arc::new(MovingAveragePolicy::<5>),
+    //     Arc::new(MovingAveragePolicy::<10>),
+    //     Arc::new(FullHistoryAveragePolicy),
+    //     Arc::new(EvenHistoryAveragePolicy),
+    //     Arc::new(ComplexFormulaPolicy),
+    //     Arc::new(DrunkardPolicy),
+    //     Arc::new(StupidNerdPolicy),
+    //  //   Arc::new(UniformPolicy::new(0.0, 1.0)),
+    // //    //Arc::new(UniformPolicy::new(0.25, 0.75)),
+    // //    // Arc::new(UniformPolicy::new(0.4, 0.6)),
+    // //    // Arc::new(WeightedHistoryPolicy::new()),
+    // //     // Arc::new(SlidingWeightedAveragePolicy::new()),
+    // //     // Arc::new(ExponentialMovingAveragePolicy::new(0.1)),
+    // //     // Arc::new(ExponentialMovingAveragePolicy::new(0.5)),
+    // //     // Arc::new(ExponentialMovingAveragePolicy::new(0.9)),
+    //     Arc::new(GeneralizedMeanPolicy::<5>::new(1.0)), // Arithmetic mean
+    //     Arc::new(GeneralizedMeanPolicy::<5>::new(2.0)), // Quadratic mean
+    //     Arc::new(GeneralizedMeanPolicy::<5>::new(-1.0)), // Harmonic mean
     ];
     let strategy_names: Vec<String> = initial_strategies.iter().map(|p| p.name()).collect();
 
     // Create simulation configuration
     let config = SimulationConfig {
-        name: "discrete_payoff_matrix_no_random_policy".to_string(),
-        description: "the random policy always wins".to_string(),
+        name: "smooth_and_everything_back_to_two".to_string(),
+        description: "We only have the always go and never go strategy and no randomization".to_string(),
         grid_size: 100,
         neighbor_distance: 1,
         temperature: 1.0,
-        policy_retention_rate: 0.2,
+        policy_retention_rate: 0.9,
         num_iterations: 2000,
-        rounds_per_update: 1,
+        rounds_per_update: 5,
         initial_strategies,
         start_random: true,
     };
